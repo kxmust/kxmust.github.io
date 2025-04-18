@@ -179,8 +179,56 @@ epoch3, loss0.000049</p>
 <span class="pl-en">print</span>(<span class="pl-s">f'w的误差: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">true_w</span><span class="pl-c1">-</span><span class="pl-s1">w</span>.<span class="pl-c1">reshape</span>(<span class="pl-s1">true_w</span>.<span class="pl-c1">shape</span>)<span class="pl-kos">}</span></span>'</span>)
 <span class="pl-en">print</span>(<span class="pl-s">f'b的误差: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">true_b</span><span class="pl-c1">-</span><span class="pl-s1">b</span><span class="pl-kos">}</span></span>'</span>)</pre></div>
 <p>结果<br>
-w的误差: tensor([-0.0006, -0.0009], grad_fn=)<br>
-b的误差: tensor([0.0014], grad_fn=)</p></div>
+w的误差: tensor([-0.0006, -0.0009])<br>
+b的误差: tensor([0.0014])</p>
+<h2>2 线性回归-利用torch中自带的方法进行简单实现</h2>
+<h3>2.1 生成数据</h3>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">numpy</span> <span class="pl-k">as</span> <span class="pl-s1">np</span>
+<span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">torch</span>.<span class="pl-s1">utils</span> <span class="pl-k">import</span> <span class="pl-s1">data</span>
+<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+
+<span class="pl-s1">true_w</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([<span class="pl-c1">2</span>,<span class="pl-c1">-</span><span class="pl-c1">3.4</span>])
+<span class="pl-s1">true_b</span> <span class="pl-c1">=</span> <span class="pl-c1">4.2</span>
+<span class="pl-s1">features</span>, <span class="pl-s1">labels</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">synthetic_data</span>(<span class="pl-s1">true_w</span>, <span class="pl-s1">true_b</span>, <span class="pl-c1">1000</span>) <span class="pl-c"># 用d2l中的工具生成人工数据和标签</span></pre></div>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 将数据导入到pytorch自带的dataset集中，然后用自带的dataloader函数进行批量随机提取</span>
+<span class="pl-k">def</span> <span class="pl-en">load_array</span>(<span class="pl-s1">data_arrays</span>, <span class="pl-s1">batch_size</span>, <span class="pl-s1">is_train</span><span class="pl-c1">=</span><span class="pl-c1">True</span>):
+    <span class="pl-s">"""构造一个pytorch数据迭代器"""</span>
+    <span class="pl-s1">dataset</span> <span class="pl-c1">=</span> <span class="pl-s1">data</span>.<span class="pl-c1">TensorDataset</span>(<span class="pl-c1">*</span><span class="pl-s1">data_arrays</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">data</span>.<span class="pl-c1">DataLoader</span>(<span class="pl-s1">dataset</span>, <span class="pl-s1">batch_size</span>, <span class="pl-s1">shuffle</span><span class="pl-c1">=</span><span class="pl-s1">is_train</span>)
+
+<span class="pl-s1">batch_size</span> <span class="pl-c1">=</span> <span class="pl-c1">10</span>
+<span class="pl-s1">data_iter</span> <span class="pl-c1">=</span> <span class="pl-en">load_array</span>((<span class="pl-s1">features</span>, <span class="pl-s1">labels</span>), <span class="pl-s1">batch_size</span>)
+<span class="pl-en">next</span>(<span class="pl-en">iter</span>(<span class="pl-s1">data_iter</span>))</pre></div>
+<h3>2.2 构建线性回归模型</h3>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 利用torch自带的方法构建神经网络模型，并初始化参数</span>
+<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
+<span class="pl-s1">net</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Sequential</span>(<span class="pl-s1">nn</span>.<span class="pl-c1">Linear</span>(<span class="pl-c1">2</span>,<span class="pl-c1">1</span>))  <span class="pl-c"># 一层的线性网络</span>
+
+<span class="pl-s1">net</span>[<span class="pl-c1">0</span>].<span class="pl-c1">weight</span>.<span class="pl-c1">data</span>.<span class="pl-c1">normal_</span>(<span class="pl-c1">0</span>,<span class="pl-c1">0.01</span>)  <span class="pl-c"># 使用正太分布函数初始化权重参数</span>
+<span class="pl-s1">net</span>[<span class="pl-c1">0</span>].<span class="pl-c1">bias</span>.<span class="pl-c1">data</span>.<span class="pl-c1">fill_</span>(<span class="pl-c1">0</span>)  </pre></div>
+<h3>2.3 损失函数和优化方法</h3>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 损失函数</span>
+<span class="pl-s1">loss</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">MSELoss</span>()
+
+<span class="pl-c"># 优化方法</span>
+<span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">optim</span>.<span class="pl-c1">SGD</span>(<span class="pl-s1">net</span>.<span class="pl-c1">parameters</span>(), <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-c1">0.03</span>)</pre></div>
+<h3>2.4 训练模型</h3>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 开始训练</span>
+<span class="pl-s1">num_epochs</span> <span class="pl-c1">=</span> <span class="pl-c1">3</span>
+<span class="pl-k">for</span> <span class="pl-s1">epoch</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_epochs</span>):
+    <span class="pl-k">for</span> <span class="pl-c1">X</span>,<span class="pl-s1">y</span> <span class="pl-c1">in</span> <span class="pl-s1">data_iter</span>:
+        <span class="pl-s1">l</span> <span class="pl-c1">=</span> <span class="pl-en">loss</span>(<span class="pl-en">net</span>(<span class="pl-c1">X</span>), <span class="pl-s1">y</span>)
+        <span class="pl-s1">trainer</span>.<span class="pl-c1">zero_grad</span>()
+        <span class="pl-s1">l</span>.<span class="pl-c1">backward</span>()
+        <span class="pl-s1">trainer</span>.<span class="pl-c1">step</span>()
+        
+    <span class="pl-s1">l</span> <span class="pl-c1">=</span> <span class="pl-en">loss</span>(<span class="pl-en">net</span>(<span class="pl-s1">features</span>), <span class="pl-s1">labels</span>)
+    <span class="pl-en">print</span>(<span class="pl-s">f'epoch<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">epoch</span><span class="pl-c1">+</span><span class="pl-c1">1</span><span class="pl-kos">}</span></span>, loss<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">l</span>: f<span class="pl-kos">}</span></span>'</span>)</pre></div>
+<p>结果<br>
+epoch1, loss 0.000393<br>
+epoch2, loss 0.000100<br>
+epoch3, loss 0.000100</p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
