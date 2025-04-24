@@ -1,5 +1,72 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Thu, 24 Apr 2025 08:47:57 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习5-Pytorch(模型搭建, 权重初始化, 权重保存和加载)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-5-Pytorch%28-mo-xing-da-jian-%2C%20-quan-zhong-chu-shi-hua-%2C%20-quan-zhong-bao-cun-he-jia-zai-%29.html</link><description># Pytorch基础
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Thu, 24 Apr 2025 09:15:41 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习6-Pytorch GPU的使用</title><link>https://kxmust.github.io/post/shen-du-xue-xi-6-Pytorch%20GPU-de-shi-yong.html</link><description># GPU的使用
+
+使用!nvidia-smi来查看GPU状态
+```python
+!nvidia-smi
+```
+
+```python
+import torch
+from torch import nn
+torch.device('cpu'), torch.cuda.device('cuda') # torch.cuda.device('cuda:1') 访问第一个GPU
+
+```
+
+定义两个函数来测试是否存在GPU如果没有则用CPU
+
+```python
+def try_gpu(i=0): #@save
+    '''如果存在，则返回gpu(i)，否则返回cpu()'''
+    if torch.cuda.device_count() &gt;= i + 1:
+        return torch.device(f'cuda:{i}')
+    return torch.device('cpu')
+    
+def try_all_gpus(): #@save
+    '''返回所有可用的GPU，如果没有GPU，则返回[cpu(),]'''
+    devices = [torch.device(f'cuda:{i}')
+        for i in range(torch.cuda.device_count())]
+    return devices if devices else [torch.device('cpu')]
+    
+try_gpu(), try_gpu(10), try_all_gpus()
+```
+
+查询张量坐在的设备
+
+```python
+x = torch.tensor([1, 2, 3])
+x.device
+```
+创建张量时，放在GPU上
+
+```python
+# 创建张量时，放在GPU上
+X = torch.ones(2, 3, device=try_gpu())
+X
+
+# 也可以在第二个GPU上创建张量
+# Y = torch.rand(2, 3, device=try_gpu(1))
+```
+
+如果你有多个GPU，可以将一个GPU上的值copy到另一个GPU上
+Z = X.cuda(1)  可以将X的值从GPU0 copy到GPU1
+数值在一个GPU上才能做计算
+
+在GPU上做神经网络
+
+```python
+# 在GPU上做神经网络
+net = nn.Sequential(nn.Linear(3, 1))
+net = net.to(device=try_gpu())  # net.to将神经网络挪动到0号GPU上 ,等于将网络的参数在0号GPU上copy一份
+
+net(X)  # x也在0号GPU上
+net[0].weight.data.device  # 查看权重参数所在的位置
+```
+
+
+
+
+。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-6-Pytorch%20GPU-de-shi-yong.html</guid><pubDate>Thu, 24 Apr 2025 09:15:14 +0000</pubDate></item><item><title>深度学习5-Pytorch(模型搭建, 权重初始化, 权重保存和加载)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-5-Pytorch%28-mo-xing-da-jian-%2C%20-quan-zhong-chu-shi-hua-%2C%20-quan-zhong-bao-cun-he-jia-zai-%29.html</link><description># Pytorch基础
 ## 1 Pytorch基础知识
 
 用nn.Sequential模组搭建一个简单的神经网络
