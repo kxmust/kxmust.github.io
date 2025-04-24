@@ -1,5 +1,64 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Wed, 23 Apr 2025 09:26:55 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习4-数值稳定性优化(权重初始化和激活函数的选择)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-4--shu-zhi-wen-ding-xing-you-hua-%28-quan-zhong-chu-shi-hua-he-ji-huo-han-shu-de-xuan-ze-%29.html</link><description># 数值稳定性
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Thu, 24 Apr 2025 08:47:57 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习5-Pytorch(模型搭建, 权重初始化, 权重保存和加载)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-5-Pytorch%28-mo-xing-da-jian-%2C%20-quan-zhong-chu-shi-hua-%2C%20-quan-zhong-bao-cun-he-jia-zai-%29.html</link><description># Pytorch基础
+## 1 Pytorch基础知识
+
+用nn.Sequential模组搭建一个简单的神经网络
+```python
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+net = nn.Sequential(nn.Linear(20, 256), nn.ReLU(), nn.Linear(256, 10))
+
+X = torch.rand(2, 20)
+
+net(X)
+
+```
+nn.Sequential是一个模组，我们也可以自己定义一个模组来构建神经网络
+
+```python
+
+class MLP(nn.Module):   # 表示是nn模组的子类
+    def __init__(self):   # 定义有哪些参数
+        super().__init__()  # 调用一个父类，来先设置需要的内部的参数
+        self.hidden = nn.Linear(20, 256)   # 定义一个线下层存在一个成员变量中
+        self.out = nn.Linear(256,10)
+
+    def forward(self, X):
+        return self.out(F.relu(self.hidden(X)))
+
+net = MLP()
+net(X)
+
+```
+
+如何实现前面的nn.Sequential模组
+```python
+
+class MySequential(nn.Module):
+    def __init__(self, *args):  #*args表示接入一个有序列表, **表示字典
+        super().__init__()
+        for block in args:
+            self._modules[block] = block  # 是一个有序的字典,_modules是一个特殊的容器，表示放进去的是每一层网络
+
+    def forward(self, X):
+        for block in self._modules.values():
+            X = block(X)    #利用每一层网络处理输入X
+        return X
+
+net = MySequential(nn.Linear(20, 256), nn.ReLU(), nn.Linear(256, 10))
+net(X)
+
+```
+
+当Sequential这个类无法满足我们的计算需求时,我们可以自定义类来实现特殊的计算
+
+```python
+class FixedHiddenMLP(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # 不计算梯度的随机权重参数。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-5-Pytorch%28-mo-xing-da-jian-%2C%20-quan-zhong-chu-shi-hua-%2C%20-quan-zhong-bao-cun-he-jia-zai-%29.html</guid><pubDate>Thu, 24 Apr 2025 08:47:28 +0000</pubDate></item><item><title>深度学习4-数值稳定性优化(权重初始化和激活函数的选择)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-4--shu-zhi-wen-ding-xing-you-hua-%28-quan-zhong-chu-shi-hua-he-ji-huo-han-shu-de-xuan-ze-%29.html</link><description># 数值稳定性
 在模型训练过程中，计算梯度是可以理解为多个矩阵的乘法，当网络模型很深时，如果每个矩阵中的值都大于0，这样就会让梯度变得非常大，导致梯度爆炸，这对模型的训练来说是致命的。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-4--shu-zhi-wen-ding-xing-you-hua-%28-quan-zhong-chu-shi-hua-he-ji-huo-han-shu-de-xuan-ze-%29.html</guid><pubDate>Wed, 23 Apr 2025 09:26:29 +0000</pubDate></item><item><title>深度学习3-多层感知机</title><link>https://kxmust.github.io/post/shen-du-xue-xi-3--duo-ceng-gan-zhi-ji.html</link><description># 多层感知机
 ## 1 感知机
 1. 感知机是一个二分类模型，输出0或者1(或者-1,1)，是最早的AI模型之一。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-3--duo-ceng-gan-zhi-ji.html</guid><pubDate>Tue, 22 Apr 2025 08:04:43 +0000</pubDate></item><item><title>深度学习2-Softmax回归(常见的损失函数，Fashion-MNIST)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-2-Softmax-hui-gui-%28-chang-jian-de-sun-shi-han-shu-%EF%BC%8CFashion-MNIST%29.html</link><description># Softmax回归
