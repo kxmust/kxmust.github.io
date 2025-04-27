@@ -40,7 +40,7 @@ AlexNet的参数量大概是46M，LeNet大概有0.6M
 AlexNet做一次先前计算大概比LeNet贵了250倍
 
 总结：
-AlexNet是一个更深的LeNet，10X的参数个数，250X的计算复杂度
+AlexNet是一个更深的LeNet，75X的参数个数，250X的计算复杂度
 新引入了丢弃法(Dropout)，ReLU，最大池化层，和数据增强
 AlexNet赢下了2012年的ImageNet竞赛，标志着新一轮的神经网络热潮的开始
 
