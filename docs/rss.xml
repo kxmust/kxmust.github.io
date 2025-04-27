@@ -1,5 +1,59 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Sat, 26 Apr 2025 12:56:24 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习8-CNN(LeNet模型)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-8-CNN%28LeNet-mo-xing-%29.html</link><description># LeNet模型
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Sun, 27 Apr 2025 05:27:38 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习9-AlexNet深度卷积神经网络</title><link>https://kxmust.github.io/post/shen-du-xue-xi-9-AlexNet-shen-du-juan-ji-shen-jing-wang-luo.html</link><description># AlexNet深度卷积神经网络
+AlexNet是引起了深度学习热潮的第一个网络
+
+&gt; 在深度学习之前，最常用的机器学习方法是核方法
+首先提取特征
+利用核函数来计算相关性，判断高维空间内两个点是否有相关性
+经过核函数处理之后就会变成凸优化问题
+有非常好的定理和数学基础
+
+现在SVM支持向量机也被广泛使用，因为它不怎么需要调参，对参数不怎么敏感
+
+在早些年，计算机视觉的工作主要在特征提取方面
+如果将原始图像直接输入SVM效果还非常差
+因此，需要科学家或者工程师都提出了大量的方法来抽取图片中的特征信息
+
+AlexNet 赢得了2012年的ImageNet竞赛
+
+## 1 AlexNet模型
+
+主要改进：
+Dropout  (模型变大了，用dropout来正则)
+ReLU
+MaxPooling
+
+AlexNet就是一个更深更大的LeNet网络，两个网络结果对比如下：
+
+![Image](https://github.com/user-attachments/assets/feb4ae15-401d-4cec-9484-b2e6dd84d3f7)
+
+
+相比于LeNet，AlexNet使用了更大的卷积核，更大的步长，因为输入的图片更大，并且使用了更大的池化窗口，使用了MaxPooling而不是AvgPooling
+并且增加了更多的卷积层
+最后也用了三层全连接层
+
+更多细节：
+激活函数从Sigmoid变为了ReLU，减缓梯度消失
+隐藏全连接层后加入了Dropout层
+做了数据增强(将图片做了很多变化，随机截取，调节亮度，随机调节色温来增加数据的变种)
+
+AlexNet的参数量大概是46M，LeNet大概有0.6M
+AlexNet做一次先前计算大概比LeNet贵了250倍
+
+总结：
+AlexNet是一个更深的LeNet，10X的参数个数，250X的计算复杂度
+新引入了丢弃法(Dropout)，ReLU，最大池化层，和数据增强
+AlexNet赢下了2012年的ImageNet竞赛，标志着新一轮的神经网络热潮的开始
+
+## 2 AlexNet的代码实现
+
+```python
+import torch
+from torch import nn
+from d2l import torch as d2l
+
+net = nn.Sequential(
+    # 这里使用一个11*11的更大窗口来捕捉对象。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-9-AlexNet-shen-du-juan-ji-shen-jing-wang-luo.html</guid><pubDate>Sun, 27 Apr 2025 05:27:14 +0000</pubDate></item><item><title>深度学习8-CNN(LeNet模型)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-8-CNN%28LeNet-mo-xing-%29.html</link><description># LeNet模型
 LeNet是最早比较经典的CNN模型，用来识别邮件上的邮编，或者支票中的金额。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-8-CNN%28LeNet-mo-xing-%29.html</guid><pubDate>Sat, 26 Apr 2025 12:55:56 +0000</pubDate></item><item><title>深度学习7-CNN基础</title><link>https://kxmust.github.io/post/shen-du-xue-xi-7-CNN-ji-chu.html</link><description># CNN卷积神经网络
 ## 1 CNN基础
 从多层感知机（MLP）到卷积神经网络（CNN）的演进中，​​平移不变性​​和​​局部性​​是两大核心设计原则，它们解决了传统MLP处理图像时的低效问题，并成为卷积操作的理论基础。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-7-CNN-ji-chu.html</guid><pubDate>Fri, 25 Apr 2025 14:19:12 +0000</pubDate></item><item><title>深度学习6-Pytorch GPU的使用</title><link>https://kxmust.github.io/post/shen-du-xue-xi-6-Pytorch%20GPU-de-shi-yong.html</link><description># GPU的使用
