@@ -1,5 +1,20 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Sun, 27 Apr 2025 05:32:50 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习9-AlexNet深度卷积神经网络</title><link>https://kxmust.github.io/post/shen-du-xue-xi-9-AlexNet-shen-du-juan-ji-shen-jing-wang-luo.html</link><description># AlexNet深度卷积神经网络
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Sun, 27 Apr 2025 08:04:58 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习10-VGG</title><link>https://kxmust.github.io/post/shen-du-xue-xi-10-VGG.html</link><description># VGG模型
+AlexNet比LeNet更深更大，得到更好的精度
+能不能设计的更深更大？
+
+有哪些选项：
+更多全连接层（太贵）
+更多的卷积层
+将卷积层组合成块
+
+## 1 VGG的结构
+VGG块将多个卷积层和一个池化层组合成块：
+
+![Image](https://github.com/user-attachments/assets/d1f806b7-8baa-4021-9eab-d59295263eeb)
+
+它这里面用了3x3的卷积核，原因是在相同的计算开销下，3x3比5
+x5的卷积核拥有更好的效果。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-10-VGG.html</guid><pubDate>Sun, 27 Apr 2025 08:04:34 +0000</pubDate></item><item><title>深度学习9-AlexNet深度卷积神经网络</title><link>https://kxmust.github.io/post/shen-du-xue-xi-9-AlexNet-shen-du-juan-ji-shen-jing-wang-luo.html</link><description># AlexNet深度卷积神经网络
 AlexNet是引起了深度学习热潮的第一个网络
 
 &gt; 在深度学习之前，最常用的机器学习方法是核方法
