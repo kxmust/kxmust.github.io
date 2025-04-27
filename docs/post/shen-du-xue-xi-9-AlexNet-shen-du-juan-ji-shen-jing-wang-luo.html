@@ -288,6 +288,7 @@ Linear output shape:	 torch.Size([1, 10])</p>
 <span class="pl-s1">train_iter</span>, <span class="pl-s1">test_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">load_data_fashion_mnist</span>(<span class="pl-s1">batch_size</span>, <span class="pl-s1">resize</span><span class="pl-c1">=</span><span class="pl-c1">224</span>) <span class="pl-c">#将图片拉到224X224匹配模型需求</span>
 
 <span class="pl-s1">lr</span>, <span class="pl-s1">num_epochs</span> <span class="pl-c1">=</span> <span class="pl-c1">0.01</span>, <span class="pl-c1">10</span>
+<span class="pl-c"># train_ch6方法可以看深度学习8的笔记有详细介绍，其中包含了损失函数和优化器</span>
 <span class="pl-s1">d2l</span>.<span class="pl-c1">train_ch6</span>(<span class="pl-s1">net</span>, <span class="pl-s1">train_iter</span>, <span class="pl-s1">test_iter</span>, <span class="pl-s1">num_epochs</span>, <span class="pl-s1">lr</span>, <span class="pl-s1">d2l</span>.<span class="pl-c1">try_gpu</span>())</pre></div>
 <p>结果：<br>
 loss 0.328, train acc 0.879, test acc 0.882<br>

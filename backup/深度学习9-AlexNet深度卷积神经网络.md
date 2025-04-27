@@ -118,6 +118,7 @@ batch_size = 128
 train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size, resize=224) #将图片拉到224X224匹配模型需求
 
 lr, num_epochs = 0.01, 10
+# train_ch6方法可以看深度学习8的笔记有详细介绍，其中包含了损失函数和优化器
 d2l.train_ch6(net, train_iter, test_iter, num_epochs, lr, d2l.try_gpu())
 ```
 结果：
