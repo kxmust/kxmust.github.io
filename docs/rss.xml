@@ -1,5 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Mon, 28 Apr 2025 08:53:09 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习13-Batch_Normalization</title><link>https://kxmust.github.io/post/shen-du-xue-xi-13-Batch_Normalization.html</link><description># Batch Normalization 批量归一化
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Mon, 28 Apr 2025 10:09:49 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习14-ResNet残差网络</title><link>https://kxmust.github.io/post/shen-du-xue-xi-14-ResNet-can-cha-wang-luo.html</link><description># ResNet残差网络
+
+考虑这样一个问题，网络是不是做的越深越好
+网络越深越能拟合更加复杂的问题？
+但是随着网络的加深，模型训练过程中可能会发生偏差，可能性能不会增加，而开销会增大
+
+我们要解决的问题是：当增加新的层的时候至少不会让模型变差。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-14-ResNet-can-cha-wang-luo.html</guid><pubDate>Mon, 28 Apr 2025 10:08:51 +0000</pubDate></item><item><title>深度学习13-Batch_Normalization</title><link>https://kxmust.github.io/post/shen-du-xue-xi-13-Batch_Normalization.html</link><description># Batch Normalization 批量归一化
 考虑一个问题，当一个网络很深的情况下
 梯度反传过程中，上面的梯度会更大，下面的梯度会更小
 这样会导致上面的网络会很快收敛，而下面的网络会更新很慢
