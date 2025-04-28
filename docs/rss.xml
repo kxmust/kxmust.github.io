@@ -1,5 +1,61 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Sun, 27 Apr 2025 13:10:25 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习12-GoogLeNet(Inception块)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-12-GoogLeNet%28Inception-kuai-%29.html</link><description># GoogLeNet模型
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Mon, 28 Apr 2025 08:53:09 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习13-Batch_Normalization</title><link>https://kxmust.github.io/post/shen-du-xue-xi-13-Batch_Normalization.html</link><description># Batch Normalization 批量归一化
+考虑一个问题，当一个网络很深的情况下
+梯度反传过程中，上面的梯度会更大，下面的梯度会更小
+这样会导致上面的网络会很快收敛，而下面的网络会更新很慢
+
+这样会有一个什么问题呢？
+当下面的参数发生变化后，对输入抽象出来的特征会发生变化，则上面的网络又需要重新训练
+导致收敛变慢
+
+因此我们可以用batch normalization 来将输出的均值和方差进行固定，
+这样的好处是在训练底部时可以避免变化顶部层
+
+## 1 批量归一化
+
+对于一个批量数据，计算均值和方差
+
+![Image](https://github.com/user-attachments/assets/ae2e4981-d004-4362-ba02-249d5e4b4f6a)
+
+利用均值和方差来进行归一化
+
+![Image](https://github.com/user-attachments/assets/d56f9e07-9069-4606-9060-715ed691bee4)
+
+特点：
+可以学习的参数是\beta 和 \gamma
+作用的位置：
+ 全连接层和卷积层的输出上，激活函数前
+ 全连接层和卷积层的输入上
+对于全连接层，作用在特征维
+对于卷积层，作用在通道层
+
+总结：
+批量归一化固定小批量的均值和方差，然后学习出适合的偏移的缩放
+可以加速收敛速度，但一般不改变模型精度
+
+## 批量归一化实现
+
+从0实现批量归一化
+
+```python
+import torch
+from torch import nn
+from d2l import torch as d2l
+
+# 批量归一化从0开始实现,（输入，（可以学的两个参数），全局的均值，全局的方差，避免除0，用来更新全局均值和方差的）
+def batch_norm(X, gamma, beta, moving_mean, moving_var, eps, momentum):
+  # 通过is_grad_enabled来判断当前模式是训练模式还是预测模式
+  if not torch.is_grad_enabled():
+    # 如果是在预测模式下，直接使用传入的移动平均所得的均值和方差
+    X_hat = (X- moving_mean) / torch.sqrt(moving_var + eps)
+  else:
+    assert len(X.shape) in (2, 4)
+    if len(X.shape) == 2:
+      # 使用全连接层的情况，计算特征维上的均值和方差
+      mean = X.mean(dim=0)
+      var = ((X- mean) ** 2).mean(dim=0)
+    else:
+      # 使用二维卷积层的情况，计算通道维上（axis=1）的均值和方差。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-13-Batch_Normalization.html</guid><pubDate>Mon, 28 Apr 2025 08:52:05 +0000</pubDate></item><item><title>深度学习12-GoogLeNet(Inception块)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-12-GoogLeNet%28Inception-kuai-%29.html</link><description># GoogLeNet模型
 
 它是一种含并行连接的网络
 之前的模型比如LeNet，AlexNet，V2G用了不同规模的卷积神经网络来提取图片特征，哪到底选择哪种？
