@@ -1,5 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Tue, 29 Apr 2025 08:27:19 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习15-多GPU并行</title><link>https://kxmust.github.io/post/shen-du-xue-xi-15--duo-GPU-bing-xing.html</link><description># 单机多卡并行
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Tue, 29 Apr 2025 11:34:26 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习16-数据增广</title><link>https://kxmust.github.io/post/shen-du-xue-xi-16--shu-ju-zeng-guang.html</link><description># 数据增广
+
+图像增广在对训练图像进行一系列的随机变化之后，生成相似但不同的训练样本，从而扩大了训练集的规模
+
+随机改变训练样本可以减少模型对某些属性的依赖，从而提高模型的泛化能力
+
+例如，我们可以以不同的方式裁剪图像，使感兴趣的对象出现在不同的位置，减少模型对于对象出现位置的依赖。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-16--shu-ju-zeng-guang.html</guid><pubDate>Tue, 29 Apr 2025 11:34:01 +0000</pubDate></item><item><title>深度学习15-多GPU并行</title><link>https://kxmust.github.io/post/shen-du-xue-xi-15--duo-GPU-bing-xing.html</link><description># 单机多卡并行
 一个机器可以安装多个GPU
 在训练和预测时，可以将小批量计算切分到多个GPU上来达到加速的目的
 
