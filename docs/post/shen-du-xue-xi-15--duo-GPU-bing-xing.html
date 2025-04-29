@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/99197662?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="# 单机多卡并行
+一个机器可以安装多个GPU
+在训练和预测时，可以将小批量计算切分到多个GPU上来达到加速的目的
+
+常用的切分方案有：
+- 数据并行-将小批量数据分成n块，每个GPU拿到完整的参数计算一块数据的梯度（通常性能更好）
+- 模型并行-（将模型分成n块，每个GPU拿到一块模型计算它的前向和反向结果，通常适用于模型大到单GPU放不下）
+- 通道并行（数据+模型并行）
+
+## 1 数据并行
+
+以两个GPU为例：
+- 在任何一次迭代中，给定的随机小批量数据将被分成两份，然后均匀分配给每个GPU
+- 每个GPU会利用分配的数据计算梯度
+- 每个GPU会将计算的梯度发出去，并且进行相加，以获得当前小批量的随机梯度
+- 将计算的聚合梯度发送给每个GPU，每个GPU利用得到的随机梯度来更新模型参数
+
+大致的流程图为：
+
+![Image](https://github.com/user-attachments/assets/b10e95f5-9f1d-4768-a684-f6103fa8f600)
+
+总结：
+-  当一个模型能用到单卡计算时，通常使用数据并行拓展到多卡上
+- 模型并行则用在超大模型上
+
+## 2 数据并行的从0实现
+
+以LeNet为例来来实现
+
+- 先构建LeNet模型
+
+```python
+%matplotlib inline
+import torch
+from torch import nn
+from torch.nn import functional as F
+from d2l import torch as d2l
+
+# 初始化模型参数
+scale = 0.01
+W1 = torch.randn(size=(20, 1, 3, 3)) * scale
+b1 = torch.zeros(20)
+W2 = torch.randn(size=(50, 20, 5, 5)) * scale
+b2 = torch.zeros(50)
+W3 = torch.randn(size=(800, 128)) * scale
+b3 = torch.zeros(128)
+W4 = torch.randn(size=(128, 10)) * scale
+b4 = torch.zeros(10)
+params = [W1, b1, W2, b2, W3, b3, W4, b4]
+
+
+# 定义模型
+def lenet(X, params):
+    h1_conv = F.conv2d(input=X, weight=params[0], bias=params[1])
+    h1_activation = F.relu(h1_conv)
+    h1 = F.avg_pool2d(input=h1_activation, kernel_size=(2, 2), stride=(2, 2))
+    h2_conv = F.conv2d(input=h1, weight=params[2], bias=params[3])
+    h2_activation = F.relu(h2_conv)
+    h2 = F.avg_pool2d(input=h2_activation, kernel_size=(2, 2), stride=(2, 2))
+    h2 = h2.reshape(h2.shape[0],-1)
+    h3_linear = torch.mm(h2, params[4]) + params[5]
+    h3 = F.relu(h3_linear)
+    y_hat = torch.mm(h3, params[6]) + params[7]
+    return y_hat
+    
+# 交叉熵损失函数
+loss = nn.CrossEntropyLoss(reduction='none')
+```
+
+- 向多个设备分发参数
+
+```python
+# 给一个参数，然后将它发送到哪个GPU上
+def get_params(params, device):  
+    new_params = [p.to(device) for p in params] 
+    for p in new_params:    # 需要计算梯度
+        p.requires_grad_()
+    return new_params
+
+# 将所有参数复制到一个GPU
+new_params = get_params(params, d2l.try_gpu(0))
+print('b1 权重:', new_params[1])
+print('b1 梯度:', new_params[1].grad)
+```
+
+- 使用allreduce函数将所有向量相加，并将结果广播给所有GPU
+
+```python
+# 将所有向量相加,并广播给所有GPU
+def allreduce(data):
+    for i in range(1, len(data)):
+        data[0][:] += data[i].to(data[0].device)  # 将数据复制到GPU0上进行相加
+    for i in range(1, len(data)):
+        data[i][:] = data[0].to(data[i].device)  # GPU0计算得到的结果发送给所有GPU
+
+data = [torch.ones((1, 2), device=d2l.try_gpu(i)) * (i + 1) for i in range(2)]
+print('allreduce之前：\n', data[0], '\n', data[1])
+allreduce(data)
+print('allreduce之后：\n', data[0], '\n', data[1])
+```
+
+- 将一个小批量数据均匀分布在多个GPU上
+
+```python
+data = torch.arange(20).reshape(4, 5)
+devices = [torch.device('cuda:0'), torch.device('cuda:1')]
+split = nn.parallel.scatter(data, devices)  # 将数据均匀切开，分配给每个GPU上
+print('input :', data)
+print('load into', devices)
+print('output:', split)
+
+```
+
+- 为了方便使用，定义一个split_batch函数，将数据和标签都进行拆分
+
+```python
+def split_batch(X, y, devices):
+    '''将X和y拆分到多个设备上'''
+    assert X.shape[0] == y.shape[0]
+    return (nn.parallel.scatter(X, devices),
+            nn.parallel.scatter(y, devices))
+```
+
+- 定义一个多GPU训练小批量数据的函数
+
+```python
+# 定义一个多GPU训练小批量数据的函数
+def train_batch(X, y, device_params, devices, lr): # 输入,所有GPU上的参数，GPU,学习率
+    X_shards, y_shards = split_batch(X, y, devices)  # 拆分数据
+    # 在每个GPU上分别计算损失, ls中包含了所有GPU中的损失
+    ls = [loss(lenet(X_shard, device_W), y_shard).sum()
+                    for X_shard, y_shard, device_W in zip(
+                        X_shards, y_shards, device_params)]
+    for l in ls: # 反向传播在每个GPU上分别执行
+        l.backward()
+    # 将每个GPU的所有梯度相加，并将其广播到所有GPU
+    with torch.no_grad():
+        for i in range(len(device_params[0])):
+            allreduce([device_params[c][i].grad for c in range(len(devices))])
+    # 在每个GPU上分别更新模型参数
+    for param in device_params:
+        d2l.sgd(param, lr, X.shape[0]) # 在这里，我们使用全尺寸的小批量
+```
+
+- 开始训练
+
+```python
+def train(num_gpus, batch_size, lr):
+    train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
+    devices = [d2l.try_gpu(i) for i in range(num_gpus)]
+    # 将模型参数复制到num_gpus个GPU
+    device_params = [get_params(params, d) for d in devices]
+    num_epochs = 10
+    animator = d2l.Animator('epoch', 'test acc', xlim=[1, num_epochs])
+    timer = d2l.Timer()
+    for epoch in range(num_epochs):
+        timer.start()
+        for X, y in train_iter:
+        # 为单个小批量执行多GPU训练
+            train_batch(X, y, device_params, devices, lr)
+            torch.cuda.synchronize()  # 同步一次,保证每个GPU都完成了
+        timer.stop()
+        # 在GPU0上评估模型
+        animator.add(epoch + 1, (d2l.evaluate_accuracy_gpu(
+            lambda x: lenet(x, device_params[0]), test_iter, devices[0]),))
+    print(f'测试精度：{animator.Y[0][-1]:.2f}，{timer.avg():.1f}秒/轮，'
+            f'在{str(devices)}')
+
+# 单GPU运行
+train(num_gpus=1, batch_size=256, lr=0.2)
+
+# 多GPU运行
+train(num_gpus=2, batch_size=256, lr=0.2)
+```
+
+[代码链接](https://github.com/kxmust/Deep_learning_note/blob/main/18.1parallel_computing.ipynb)
+
+## 3 数据并行的简单实现
+
+- 首先构建模型
+
+```python
+import torch
+from torch import nn
+from d2l import torch as d2l
+
+# 定义模型
+def resnet18(num_classes, in_channels=1):
+    '''稍加修改的ResNet-18模型'''
+    def resnet_block(in_channels, out_channels, num_residuals,
+                    first_block=False):
+        blk = []
+        for i in range(num_residuals):
+            if i == 0 and not first_block:
+                blk.append(d2l.Residual(out_channels,
+                        use_1x1conv=True, strides=2))
+            else:
+                blk.append(d2l.Residual(out_channels, out_channels))
+        return nn.Sequential(*blk)
+
+    # 该模型使用了更小的卷积核、步长和填充，而且删除了最大汇聚层
+    net = nn.Sequential(
+        nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(64),
+        nn.ReLU())
+    net.add_module('resnet_block1', resnet_block(64, 64, 2, first_block=True))
+    net.add_module('resnet_block2', resnet_block(64, 128, 2))
+    net.add_module('resnet_block3', resnet_block(128, 256, 2))
+    net.add_module('resnet_block4', resnet_block(256, 512, 2))
+    net.add_module('global_avg_pool', nn.AdaptiveAvgPool2d((1,1)))
+    net.add_module('fc', nn.Sequential(nn.Flatten(),
+    nn.Linear(512, num_classes)))
+    return net
+```
+
+- 网络初始化
+
+```python
+# 网络初始化
+net = resnet18(10)
+# 获取GPU列表
+devices = d2l.try_all_gpus()
+# 我们将在训练代码实现中初始化网络
+```
+
+- 训练函数
+
+```python
+def train(net, num_gpus, batch_size, lr):
+    train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
+    devices = [d2l.try_gpu(i) for i in range(num_gpus)]
+    
+    def init_weights(m):
+        if type(m) in [nn.Linear, nn.Conv2d]:
+            nn.init.normal_(m.weight, std=0.01)
+    net.apply(init_weights)
+    
+    # 在多个GPU上设置模型
+    net = nn.DataParallel(net, device_ids=devices) #给定一个网络,给定GPU，然后将Net复制到每个GPU上
+    trainer = torch.optim.SGD(net.parameters(), lr)
+    loss = nn.CrossEntropyLoss()
+    timer, num_epochs = d2l.Timer(), 10
+    animator = d2l.Animator('epoch', 'test acc', xlim=[1, num_epochs])
+    for epoch in range(num_epochs):
+        net.train()
+        timer.start()
+        for X, y in train_iter:
+            trainer.zero_grad()
+            X, y = X.to(devices[0]), y.to(devices[0])
+            l = loss(net(X), y)
+            l.backward()
+            trainer.step()
+        timer.stop()
+        animator.add(epoch + 1, (d2l.evaluate_accuracy_gpu(net, test_iter),))
+    print(f'测试精度：{animator.Y[0][-1]:.2f}，{timer.avg():.1f}秒/轮，'
+        f'在{str(devices)}')
+
+# 单卡训练
+train(net, num_gpus=1, batch_size=256, lr=0.1)
+# 多卡训练
+train(net, num_gpus=2, batch_size=512, lr=0.2)
+```
+
+[代码链接](https://github.com/kxmust/Deep_learning_note/blob/main/18.2parallel_computing_simple.ipynb)
+。">
+<meta property="og:title" content="深度学习15-多GPU并行">
+<meta property="og:description" content="# 单机多卡并行
+一个机器可以安装多个GPU
+在训练和预测时，可以将小批量计算切分到多个GPU上来达到加速的目的
+
+常用的切分方案有：
+- 数据并行-将小批量数据分成n块，每个GPU拿到完整的参数计算一块数据的梯度（通常性能更好）
+- 模型并行-（将模型分成n块，每个GPU拿到一块模型计算它的前向和反向结果，通常适用于模型大到单GPU放不下）
+- 通道并行（数据+模型并行）
+
+## 1 数据并行
+
+以两个GPU为例：
+- 在任何一次迭代中，给定的随机小批量数据将被分成两份，然后均匀分配给每个GPU
+- 每个GPU会利用分配的数据计算梯度
+- 每个GPU会将计算的梯度发出去，并且进行相加，以获得当前小批量的随机梯度
+- 将计算的聚合梯度发送给每个GPU，每个GPU利用得到的随机梯度来更新模型参数
+
+大致的流程图为：
+
+![Image](https://github.com/user-attachments/assets/b10e95f5-9f1d-4768-a684-f6103fa8f600)
+
+总结：
+-  当一个模型能用到单卡计算时，通常使用数据并行拓展到多卡上
+- 模型并行则用在超大模型上
+
+## 2 数据并行的从0实现
+
+以LeNet为例来来实现
+
+- 先构建LeNet模型
+
+```python
+%matplotlib inline
+import torch
+from torch import nn
+from torch.nn import functional as F
+from d2l import torch as d2l
+
+# 初始化模型参数
+scale = 0.01
+W1 = torch.randn(size=(20, 1, 3, 3)) * scale
+b1 = torch.zeros(20)
+W2 = torch.randn(size=(50, 20, 5, 5)) * scale
+b2 = torch.zeros(50)
+W3 = torch.randn(size=(800, 128)) * scale
+b3 = torch.zeros(128)
+W4 = torch.randn(size=(128, 10)) * scale
+b4 = torch.zeros(10)
+params = [W1, b1, W2, b2, W3, b3, W4, b4]
+
+
+# 定义模型
+def lenet(X, params):
+    h1_conv = F.conv2d(input=X, weight=params[0], bias=params[1])
+    h1_activation = F.relu(h1_conv)
+    h1 = F.avg_pool2d(input=h1_activation, kernel_size=(2, 2), stride=(2, 2))
+    h2_conv = F.conv2d(input=h1, weight=params[2], bias=params[3])
+    h2_activation = F.relu(h2_conv)
+    h2 = F.avg_pool2d(input=h2_activation, kernel_size=(2, 2), stride=(2, 2))
+    h2 = h2.reshape(h2.shape[0],-1)
+    h3_linear = torch.mm(h2, params[4]) + params[5]
+    h3 = F.relu(h3_linear)
+    y_hat = torch.mm(h3, params[6]) + params[7]
+    return y_hat
+    
+# 交叉熵损失函数
+loss = nn.CrossEntropyLoss(reduction='none')
+```
+
+- 向多个设备分发参数
+
+```python
+# 给一个参数，然后将它发送到哪个GPU上
+def get_params(params, device):  
+    new_params = [p.to(device) for p in params] 
+    for p in new_params:    # 需要计算梯度
+        p.requires_grad_()
+    return new_params
+
+# 将所有参数复制到一个GPU
+new_params = get_params(params, d2l.try_gpu(0))
+print('b1 权重:', new_params[1])
+print('b1 梯度:', new_params[1].grad)
+```
+
+- 使用allreduce函数将所有向量相加，并将结果广播给所有GPU
+
+```python
+# 将所有向量相加,并广播给所有GPU
+def allreduce(data):
+    for i in range(1, len(data)):
+        data[0][:] += data[i].to(data[0].device)  # 将数据复制到GPU0上进行相加
+    for i in range(1, len(data)):
+        data[i][:] = data[0].to(data[i].device)  # GPU0计算得到的结果发送给所有GPU
+
+data = [torch.ones((1, 2), device=d2l.try_gpu(i)) * (i + 1) for i in range(2)]
+print('allreduce之前：\n', data[0], '\n', data[1])
+allreduce(data)
+print('allreduce之后：\n', data[0], '\n', data[1])
+```
+
+- 将一个小批量数据均匀分布在多个GPU上
+
+```python
+data = torch.arange(20).reshape(4, 5)
+devices = [torch.device('cuda:0'), torch.device('cuda:1')]
+split = nn.parallel.scatter(data, devices)  # 将数据均匀切开，分配给每个GPU上
+print('input :', data)
+print('load into', devices)
+print('output:', split)
+
+```
+
+- 为了方便使用，定义一个split_batch函数，将数据和标签都进行拆分
+
+```python
+def split_batch(X, y, devices):
+    '''将X和y拆分到多个设备上'''
+    assert X.shape[0] == y.shape[0]
+    return (nn.parallel.scatter(X, devices),
+            nn.parallel.scatter(y, devices))
+```
+
+- 定义一个多GPU训练小批量数据的函数
+
+```python
+# 定义一个多GPU训练小批量数据的函数
+def train_batch(X, y, device_params, devices, lr): # 输入,所有GPU上的参数，GPU,学习率
+    X_shards, y_shards = split_batch(X, y, devices)  # 拆分数据
+    # 在每个GPU上分别计算损失, ls中包含了所有GPU中的损失
+    ls = [loss(lenet(X_shard, device_W), y_shard).sum()
+                    for X_shard, y_shard, device_W in zip(
+                        X_shards, y_shards, device_params)]
+    for l in ls: # 反向传播在每个GPU上分别执行
+        l.backward()
+    # 将每个GPU的所有梯度相加，并将其广播到所有GPU
+    with torch.no_grad():
+        for i in range(len(device_params[0])):
+            allreduce([device_params[c][i].grad for c in range(len(devices))])
+    # 在每个GPU上分别更新模型参数
+    for param in device_params:
+        d2l.sgd(param, lr, X.shape[0]) # 在这里，我们使用全尺寸的小批量
+```
+
+- 开始训练
+
+```python
+def train(num_gpus, batch_size, lr):
+    train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
+    devices = [d2l.try_gpu(i) for i in range(num_gpus)]
+    # 将模型参数复制到num_gpus个GPU
+    device_params = [get_params(params, d) for d in devices]
+    num_epochs = 10
+    animator = d2l.Animator('epoch', 'test acc', xlim=[1, num_epochs])
+    timer = d2l.Timer()
+    for epoch in range(num_epochs):
+        timer.start()
+        for X, y in train_iter:
+        # 为单个小批量执行多GPU训练
+            train_batch(X, y, device_params, devices, lr)
+            torch.cuda.synchronize()  # 同步一次,保证每个GPU都完成了
+        timer.stop()
+        # 在GPU0上评估模型
+        animator.add(epoch + 1, (d2l.evaluate_accuracy_gpu(
+            lambda x: lenet(x, device_params[0]), test_iter, devices[0]),))
+    print(f'测试精度：{animator.Y[0][-1]:.2f}，{timer.avg():.1f}秒/轮，'
+            f'在{str(devices)}')
+
+# 单GPU运行
+train(num_gpus=1, batch_size=256, lr=0.2)
+
+# 多GPU运行
+train(num_gpus=2, batch_size=256, lr=0.2)
+```
+
+[代码链接](https://github.com/kxmust/Deep_learning_note/blob/main/18.1parallel_computing.ipynb)
+
+## 3 数据并行的简单实现
+
+- 首先构建模型
+
+```python
+import torch
+from torch import nn
+from d2l import torch as d2l
+
+# 定义模型
+def resnet18(num_classes, in_channels=1):
+    '''稍加修改的ResNet-18模型'''
+    def resnet_block(in_channels, out_channels, num_residuals,
+                    first_block=False):
+        blk = []
+        for i in range(num_residuals):
+            if i == 0 and not first_block:
+                blk.append(d2l.Residual(out_channels,
+                        use_1x1conv=True, strides=2))
+            else:
+                blk.append(d2l.Residual(out_channels, out_channels))
+        return nn.Sequential(*blk)
+
+    # 该模型使用了更小的卷积核、步长和填充，而且删除了最大汇聚层
+    net = nn.Sequential(
+        nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1),
+        nn.BatchNorm2d(64),
+        nn.ReLU())
+    net.add_module('resnet_block1', resnet_block(64, 64, 2, first_block=True))
+    net.add_module('resnet_block2', resnet_block(64, 128, 2))
+    net.add_module('resnet_block3', resnet_block(128, 256, 2))
+    net.add_module('resnet_block4', resnet_block(256, 512, 2))
+    net.add_module('global_avg_pool', nn.AdaptiveAvgPool2d((1,1)))
+    net.add_module('fc', nn.Sequential(nn.Flatten(),
+    nn.Linear(512, num_classes)))
+    return net
+```
+
+- 网络初始化
+
+```python
+# 网络初始化
+net = resnet18(10)
+# 获取GPU列表
+devices = d2l.try_all_gpus()
+# 我们将在训练代码实现中初始化网络
+```
+
+- 训练函数
+
+```python
+def train(net, num_gpus, batch_size, lr):
+    train_iter, test_iter = d2l.load_data_fashion_mnist(batch_size)
+    devices = [d2l.try_gpu(i) for i in range(num_gpus)]
+    
+    def init_weights(m):
+        if type(m) in [nn.Linear, nn.Conv2d]:
+            nn.init.normal_(m.weight, std=0.01)
+    net.apply(init_weights)
+    
+    # 在多个GPU上设置模型
+    net = nn.DataParallel(net, device_ids=devices) #给定一个网络,给定GPU，然后将Net复制到每个GPU上
+    trainer = torch.optim.SGD(net.parameters(), lr)
+    loss = nn.CrossEntropyLoss()
+    timer, num_epochs = d2l.Timer(), 10
+    animator = d2l.Animator('epoch', 'test acc', xlim=[1, num_epochs])
+    for epoch in range(num_epochs):
+        net.train()
+        timer.start()
+        for X, y in train_iter:
+            trainer.zero_grad()
+            X, y = X.to(devices[0]), y.to(devices[0])
+            l = loss(net(X), y)
+            l.backward()
+            trainer.step()
+        timer.stop()
+        animator.add(epoch + 1, (d2l.evaluate_accuracy_gpu(net, test_iter),))
+    print(f'测试精度：{animator.Y[0][-1]:.2f}，{timer.avg():.1f}秒/轮，'
+        f'在{str(devices)}')
+
+# 单卡训练
+train(net, num_gpus=1, batch_size=256, lr=0.1)
+# 多卡训练
+train(net, num_gpus=2, batch_size=512, lr=0.2)
+```
+
+[代码链接](https://github.com/kxmust/Deep_learning_note/blob/main/18.2parallel_computing_simple.ipynb)
+。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kxmust.github.io/post/shen-du-xue-xi-15--duo-GPU-bing-xing.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
+<title>深度学习15-多GPU并行</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">深度学习15-多GPU并行</h1>
+<div class="title-right">
+    <a href="https://kxmust.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/kxmust/kxmust.github.io/issues/16" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><h1>单机多卡并行</h1>
+<p>一个机器可以安装多个GPU<br>
+在训练和预测时，可以将小批量计算切分到多个GPU上来达到加速的目的</p>
+<p>常用的切分方案有：</p>
+<ul>
+<li>数据并行-将小批量数据分成n块，每个GPU拿到完整的参数计算一块数据的梯度（通常性能更好）</li>
+<li>模型并行-（将模型分成n块，每个GPU拿到一块模型计算它的前向和反向结果，通常适用于模型大到单GPU放不下）</li>
+<li>通道并行（数据+模型并行）</li>
+</ul>
+<h2>1 数据并行</h2>
+<p>以两个GPU为例：</p>
+<ul>
+<li>在任何一次迭代中，给定的随机小批量数据将被分成两份，然后均匀分配给每个GPU</li>
+<li>每个GPU会利用分配的数据计算梯度</li>
+<li>每个GPU会将计算的梯度发出去，并且进行相加，以获得当前小批量的随机梯度</li>
+<li>将计算的聚合梯度发送给每个GPU，每个GPU利用得到的随机梯度来更新模型参数</li>
+</ul>
+<p>大致的流程图为：</p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/b10e95f5-9f1d-4768-a684-f6103fa8f600"><img src="https://github.com/user-attachments/assets/b10e95f5-9f1d-4768-a684-f6103fa8f600" alt="Image" style="max-width: 100%;"></a></p>
+<p>总结：</p>
+<ul>
+<li>当一个模型能用到单卡计算时，通常使用数据并行拓展到多卡上</li>
+<li>模型并行则用在超大模型上</li>
+</ul>
+<h2>2 数据并行的从0实现</h2>
+<p>以LeNet为例来来实现</p>
+<ul>
+<li>先构建LeNet模型</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">%</span><span class="pl-s1">matplotlib</span> <span class="pl-s1">inline</span>
+<span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
+<span class="pl-k">from</span> <span class="pl-s1">torch</span>.<span class="pl-s1">nn</span> <span class="pl-k">import</span> <span class="pl-s1">functional</span> <span class="pl-k">as</span> <span class="pl-c1">F</span>
+<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+
+<span class="pl-c"># 初始化模型参数</span>
+<span class="pl-s1">scale</span> <span class="pl-c1">=</span> <span class="pl-c1">0.01</span>
+<span class="pl-v">W1</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">randn</span>(<span class="pl-s1">size</span><span class="pl-c1">=</span>(<span class="pl-c1">20</span>, <span class="pl-c1">1</span>, <span class="pl-c1">3</span>, <span class="pl-c1">3</span>)) <span class="pl-c1">*</span> <span class="pl-s1">scale</span>
+<span class="pl-s1">b1</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>(<span class="pl-c1">20</span>)
+<span class="pl-v">W2</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">randn</span>(<span class="pl-s1">size</span><span class="pl-c1">=</span>(<span class="pl-c1">50</span>, <span class="pl-c1">20</span>, <span class="pl-c1">5</span>, <span class="pl-c1">5</span>)) <span class="pl-c1">*</span> <span class="pl-s1">scale</span>
+<span class="pl-s1">b2</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>(<span class="pl-c1">50</span>)
+<span class="pl-v">W3</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">randn</span>(<span class="pl-s1">size</span><span class="pl-c1">=</span>(<span class="pl-c1">800</span>, <span class="pl-c1">128</span>)) <span class="pl-c1">*</span> <span class="pl-s1">scale</span>
+<span class="pl-s1">b3</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>(<span class="pl-c1">128</span>)
+<span class="pl-v">W4</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">randn</span>(<span class="pl-s1">size</span><span class="pl-c1">=</span>(<span class="pl-c1">128</span>, <span class="pl-c1">10</span>)) <span class="pl-c1">*</span> <span class="pl-s1">scale</span>
+<span class="pl-s1">b4</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>(<span class="pl-c1">10</span>)
+<span class="pl-s1">params</span> <span class="pl-c1">=</span> [<span class="pl-v">W1</span>, <span class="pl-s1">b1</span>, <span class="pl-v">W2</span>, <span class="pl-s1">b2</span>, <span class="pl-v">W3</span>, <span class="pl-s1">b3</span>, <span class="pl-v">W4</span>, <span class="pl-s1">b4</span>]
+
+
+<span class="pl-c"># 定义模型</span>
+<span class="pl-k">def</span> <span class="pl-en">lenet</span>(<span class="pl-c1">X</span>, <span class="pl-s1">params</span>):
+    <span class="pl-s1">h1_conv</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">conv2d</span>(<span class="pl-s1">input</span><span class="pl-c1">=</span><span class="pl-c1">X</span>, <span class="pl-s1">weight</span><span class="pl-c1">=</span><span class="pl-s1">params</span>[<span class="pl-c1">0</span>], <span class="pl-s1">bias</span><span class="pl-c1">=</span><span class="pl-s1">params</span>[<span class="pl-c1">1</span>])
+    <span class="pl-s1">h1_activation</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">relu</span>(<span class="pl-s1">h1_conv</span>)
+    <span class="pl-s1">h1</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">avg_pool2d</span>(<span class="pl-s1">input</span><span class="pl-c1">=</span><span class="pl-s1">h1_activation</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">2</span>), <span class="pl-s1">stride</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">2</span>))
+    <span class="pl-s1">h2_conv</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">conv2d</span>(<span class="pl-s1">input</span><span class="pl-c1">=</span><span class="pl-s1">h1</span>, <span class="pl-s1">weight</span><span class="pl-c1">=</span><span class="pl-s1">params</span>[<span class="pl-c1">2</span>], <span class="pl-s1">bias</span><span class="pl-c1">=</span><span class="pl-s1">params</span>[<span class="pl-c1">3</span>])
+    <span class="pl-s1">h2_activation</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">relu</span>(<span class="pl-s1">h2_conv</span>)
+    <span class="pl-s1">h2</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">avg_pool2d</span>(<span class="pl-s1">input</span><span class="pl-c1">=</span><span class="pl-s1">h2_activation</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">2</span>), <span class="pl-s1">stride</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">2</span>))
+    <span class="pl-s1">h2</span> <span class="pl-c1">=</span> <span class="pl-s1">h2</span>.<span class="pl-c1">reshape</span>(<span class="pl-s1">h2</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>],<span class="pl-c1">-</span><span class="pl-c1">1</span>)
+    <span class="pl-s1">h3_linear</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">mm</span>(<span class="pl-s1">h2</span>, <span class="pl-s1">params</span>[<span class="pl-c1">4</span>]) <span class="pl-c1">+</span> <span class="pl-s1">params</span>[<span class="pl-c1">5</span>]
+    <span class="pl-s1">h3</span> <span class="pl-c1">=</span> <span class="pl-c1">F</span>.<span class="pl-c1">relu</span>(<span class="pl-s1">h3_linear</span>)
+    <span class="pl-s1">y_hat</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">mm</span>(<span class="pl-s1">h3</span>, <span class="pl-s1">params</span>[<span class="pl-c1">6</span>]) <span class="pl-c1">+</span> <span class="pl-s1">params</span>[<span class="pl-c1">7</span>]
+    <span class="pl-k">return</span> <span class="pl-s1">y_hat</span>
+    
+<span class="pl-c"># 交叉熵损失函数</span>
+<span class="pl-s1">loss</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">CrossEntropyLoss</span>(<span class="pl-s1">reduction</span><span class="pl-c1">=</span><span class="pl-s">'none'</span>)</pre></div>
+<ul>
+<li>向多个设备分发参数</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 给一个参数，然后将它发送到哪个GPU上</span>
+<span class="pl-k">def</span> <span class="pl-en">get_params</span>(<span class="pl-s1">params</span>, <span class="pl-s1">device</span>):  
+    <span class="pl-s1">new_params</span> <span class="pl-c1">=</span> [<span class="pl-s1">p</span>.<span class="pl-c1">to</span>(<span class="pl-s1">device</span>) <span class="pl-k">for</span> <span class="pl-s1">p</span> <span class="pl-c1">in</span> <span class="pl-s1">params</span>] 
+    <span class="pl-k">for</span> <span class="pl-s1">p</span> <span class="pl-c1">in</span> <span class="pl-s1">new_params</span>:    <span class="pl-c"># 需要计算梯度</span>
+        <span class="pl-s1">p</span>.<span class="pl-c1">requires_grad_</span>()
+    <span class="pl-k">return</span> <span class="pl-s1">new_params</span>
+
+<span class="pl-c"># 将所有参数复制到一个GPU</span>
+<span class="pl-s1">new_params</span> <span class="pl-c1">=</span> <span class="pl-en">get_params</span>(<span class="pl-s1">params</span>, <span class="pl-s1">d2l</span>.<span class="pl-c1">try_gpu</span>(<span class="pl-c1">0</span>))
+<span class="pl-en">print</span>(<span class="pl-s">'b1 权重:'</span>, <span class="pl-s1">new_params</span>[<span class="pl-c1">1</span>])
+<span class="pl-en">print</span>(<span class="pl-s">'b1 梯度:'</span>, <span class="pl-s1">new_params</span>[<span class="pl-c1">1</span>].<span class="pl-c1">grad</span>)</pre></div>
+<ul>
+<li>使用allreduce函数将所有向量相加，并将结果广播给所有GPU</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 将所有向量相加,并广播给所有GPU</span>
+<span class="pl-k">def</span> <span class="pl-en">allreduce</span>(<span class="pl-s1">data</span>):
+    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">1</span>, <span class="pl-en">len</span>(<span class="pl-s1">data</span>)):
+        <span class="pl-s1">data</span>[<span class="pl-c1">0</span>][:] <span class="pl-c1">+=</span> <span class="pl-s1">data</span>[<span class="pl-s1">i</span>].<span class="pl-c1">to</span>(<span class="pl-s1">data</span>[<span class="pl-c1">0</span>].<span class="pl-c1">device</span>)  <span class="pl-c"># 将数据复制到GPU0上进行相加</span>
+    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">1</span>, <span class="pl-en">len</span>(<span class="pl-s1">data</span>)):
+        <span class="pl-s1">data</span>[<span class="pl-s1">i</span>][:] <span class="pl-c1">=</span> <span class="pl-s1">data</span>[<span class="pl-c1">0</span>].<span class="pl-c1">to</span>(<span class="pl-s1">data</span>[<span class="pl-s1">i</span>].<span class="pl-c1">device</span>)  <span class="pl-c"># GPU0计算得到的结果发送给所有GPU</span>
+
+<span class="pl-s1">data</span> <span class="pl-c1">=</span> [<span class="pl-s1">torch</span>.<span class="pl-c1">ones</span>((<span class="pl-c1">1</span>, <span class="pl-c1">2</span>), <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">d2l</span>.<span class="pl-c1">try_gpu</span>(<span class="pl-s1">i</span>)) <span class="pl-c1">*</span> (<span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>) <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">2</span>)]
+<span class="pl-en">print</span>(<span class="pl-s">'allreduce之前：<span class="pl-cce">\n</span>'</span>, <span class="pl-s1">data</span>[<span class="pl-c1">0</span>], <span class="pl-s">'<span class="pl-cce">\n</span>'</span>, <span class="pl-s1">data</span>[<span class="pl-c1">1</span>])
+<span class="pl-en">allreduce</span>(<span class="pl-s1">data</span>)
+<span class="pl-en">print</span>(<span class="pl-s">'allreduce之后：<span class="pl-cce">\n</span>'</span>, <span class="pl-s1">data</span>[<span class="pl-c1">0</span>], <span class="pl-s">'<span class="pl-cce">\n</span>'</span>, <span class="pl-s1">data</span>[<span class="pl-c1">1</span>])</pre></div>
+<ul>
+<li>将一个小批量数据均匀分布在多个GPU上</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">data</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">arange</span>(<span class="pl-c1">20</span>).<span class="pl-c1">reshape</span>(<span class="pl-c1">4</span>, <span class="pl-c1">5</span>)
+<span class="pl-s1">devices</span> <span class="pl-c1">=</span> [<span class="pl-s1">torch</span>.<span class="pl-c1">device</span>(<span class="pl-s">'cuda:0'</span>), <span class="pl-s1">torch</span>.<span class="pl-c1">device</span>(<span class="pl-s">'cuda:1'</span>)]
+<span class="pl-s1">split</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">parallel</span>.<span class="pl-c1">scatter</span>(<span class="pl-s1">data</span>, <span class="pl-s1">devices</span>)  <span class="pl-c"># 将数据均匀切开，分配给每个GPU上</span>
+<span class="pl-en">print</span>(<span class="pl-s">'input :'</span>, <span class="pl-s1">data</span>)
+<span class="pl-en">print</span>(<span class="pl-s">'load into'</span>, <span class="pl-s1">devices</span>)
+<span class="pl-en">print</span>(<span class="pl-s">'output:'</span>, <span class="pl-s1">split</span>)</pre></div>
+<ul>
+<li>为了方便使用，定义一个split_batch函数，将数据和标签都进行拆分</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">split_batch</span>(<span class="pl-c1">X</span>, <span class="pl-s1">y</span>, <span class="pl-s1">devices</span>):
+    <span class="pl-s">"""将X和y拆分到多个设备上"""</span>
+    <span class="pl-k">assert</span> <span class="pl-c1">X</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>] <span class="pl-c1">==</span> <span class="pl-s1">y</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]
+    <span class="pl-k">return</span> (<span class="pl-s1">nn</span>.<span class="pl-c1">parallel</span>.<span class="pl-c1">scatter</span>(<span class="pl-c1">X</span>, <span class="pl-s1">devices</span>),
+            <span class="pl-s1">nn</span>.<span class="pl-c1">parallel</span>.<span class="pl-c1">scatter</span>(<span class="pl-s1">y</span>, <span class="pl-s1">devices</span>))</pre></div>
+<ul>
+<li>定义一个多GPU训练小批量数据的函数</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 定义一个多GPU训练小批量数据的函数</span>
+<span class="pl-k">def</span> <span class="pl-en">train_batch</span>(<span class="pl-c1">X</span>, <span class="pl-s1">y</span>, <span class="pl-s1">device_params</span>, <span class="pl-s1">devices</span>, <span class="pl-s1">lr</span>): <span class="pl-c"># 输入,所有GPU上的参数，GPU,学习率</span>
+    <span class="pl-v">X_shards</span>, <span class="pl-s1">y_shards</span> <span class="pl-c1">=</span> <span class="pl-en">split_batch</span>(<span class="pl-c1">X</span>, <span class="pl-s1">y</span>, <span class="pl-s1">devices</span>)  <span class="pl-c"># 拆分数据</span>
+    <span class="pl-c"># 在每个GPU上分别计算损失, ls中包含了所有GPU中的损失</span>
+    <span class="pl-s1">ls</span> <span class="pl-c1">=</span> [<span class="pl-en">loss</span>(<span class="pl-en">lenet</span>(<span class="pl-v">X_shard</span>, <span class="pl-s1">device_W</span>), <span class="pl-s1">y_shard</span>).<span class="pl-c1">sum</span>()
+                    <span class="pl-k">for</span> <span class="pl-v">X_shard</span>, <span class="pl-s1">y_shard</span>, <span class="pl-s1">device_W</span> <span class="pl-c1">in</span> <span class="pl-en">zip</span>(
+                        <span class="pl-v">X_shards</span>, <span class="pl-s1">y_shards</span>, <span class="pl-s1">device_params</span>)]
+    <span class="pl-k">for</span> <span class="pl-s1">l</span> <span class="pl-c1">in</span> <span class="pl-s1">ls</span>: <span class="pl-c"># 反向传播在每个GPU上分别执行</span>
+        <span class="pl-s1">l</span>.<span class="pl-c1">backward</span>()
+    <span class="pl-c"># 将每个GPU的所有梯度相加，并将其广播到所有GPU</span>
+    <span class="pl-k">with</span> <span class="pl-s1">torch</span>.<span class="pl-c1">no_grad</span>():
+        <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-en">len</span>(<span class="pl-s1">device_params</span>[<span class="pl-c1">0</span>])):
+            <span class="pl-en">allreduce</span>([<span class="pl-s1">device_params</span>[<span class="pl-s1">c</span>][<span class="pl-s1">i</span>].<span class="pl-c1">grad</span> <span class="pl-k">for</span> <span class="pl-s1">c</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-en">len</span>(<span class="pl-s1">devices</span>))])
+    <span class="pl-c"># 在每个GPU上分别更新模型参数</span>
+    <span class="pl-k">for</span> <span class="pl-s1">param</span> <span class="pl-c1">in</span> <span class="pl-s1">device_params</span>:
+        <span class="pl-s1">d2l</span>.<span class="pl-c1">sgd</span>(<span class="pl-s1">param</span>, <span class="pl-s1">lr</span>, <span class="pl-c1">X</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]) <span class="pl-c"># 在这里，我们使用全尺寸的小批量</span></pre></div>
+<ul>
+<li>开始训练</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">train</span>(<span class="pl-s1">num_gpus</span>, <span class="pl-s1">batch_size</span>, <span class="pl-s1">lr</span>):
+    <span class="pl-s1">train_iter</span>, <span class="pl-s1">test_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">load_data_fashion_mnist</span>(<span class="pl-s1">batch_size</span>)
+    <span class="pl-s1">devices</span> <span class="pl-c1">=</span> [<span class="pl-s1">d2l</span>.<span class="pl-c1">try_gpu</span>(<span class="pl-s1">i</span>) <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_gpus</span>)]
+    <span class="pl-c"># 将模型参数复制到num_gpus个GPU</span>
+    <span class="pl-s1">device_params</span> <span class="pl-c1">=</span> [<span class="pl-en">get_params</span>(<span class="pl-s1">params</span>, <span class="pl-s1">d</span>) <span class="pl-k">for</span> <span class="pl-s1">d</span> <span class="pl-c1">in</span> <span class="pl-s1">devices</span>]
+    <span class="pl-s1">num_epochs</span> <span class="pl-c1">=</span> <span class="pl-c1">10</span>
+    <span class="pl-s1">animator</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">Animator</span>(<span class="pl-s">'epoch'</span>, <span class="pl-s">'test acc'</span>, <span class="pl-s1">xlim</span><span class="pl-c1">=</span>[<span class="pl-c1">1</span>, <span class="pl-s1">num_epochs</span>])
+    <span class="pl-s1">timer</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">Timer</span>()
+    <span class="pl-k">for</span> <span class="pl-s1">epoch</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_epochs</span>):
+        <span class="pl-s1">timer</span>.<span class="pl-c1">start</span>()
+        <span class="pl-k">for</span> <span class="pl-c1">X</span>, <span class="pl-s1">y</span> <span class="pl-c1">in</span> <span class="pl-s1">train_iter</span>:
+        <span class="pl-c"># 为单个小批量执行多GPU训练</span>
+            <span class="pl-en">train_batch</span>(<span class="pl-c1">X</span>, <span class="pl-s1">y</span>, <span class="pl-s1">device_params</span>, <span class="pl-s1">devices</span>, <span class="pl-s1">lr</span>)
+            <span class="pl-s1">torch</span>.<span class="pl-c1">cuda</span>.<span class="pl-c1">synchronize</span>()  <span class="pl-c"># 同步一次,保证每个GPU都完成了</span>
+        <span class="pl-s1">timer</span>.<span class="pl-c1">stop</span>()
+        <span class="pl-c"># 在GPU0上评估模型</span>
+        <span class="pl-s1">animator</span>.<span class="pl-c1">add</span>(<span class="pl-s1">epoch</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, (<span class="pl-s1">d2l</span>.<span class="pl-c1">evaluate_accuracy_gpu</span>(
+            <span class="pl-k">lambda</span> <span class="pl-s1">x</span>: <span class="pl-en">lenet</span>(<span class="pl-s1">x</span>, <span class="pl-s1">device_params</span>[<span class="pl-c1">0</span>]), <span class="pl-s1">test_iter</span>, <span class="pl-s1">devices</span>[<span class="pl-c1">0</span>]),))
+    <span class="pl-en">print</span>(<span class="pl-s">f'测试精度：<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">animator</span>.<span class="pl-c1">Y</span>[<span class="pl-c1">0</span>][<span class="pl-c1">-</span><span class="pl-c1">1</span>]:.2f<span class="pl-kos">}</span></span>，<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">timer</span>.<span class="pl-c1">avg</span>():.1f<span class="pl-kos">}</span></span>秒/轮，'</span>
+            <span class="pl-s">f'在<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">str</span>(<span class="pl-s1">devices</span>)<span class="pl-kos">}</span></span>'</span>)
+
+<span class="pl-c"># 单GPU运行</span>
+<span class="pl-en">train</span>(<span class="pl-s1">num_gpus</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">256</span>, <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-c1">0.2</span>)
+
+<span class="pl-c"># 多GPU运行</span>
+<span class="pl-en">train</span>(<span class="pl-s1">num_gpus</span><span class="pl-c1">=</span><span class="pl-c1">2</span>, <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">256</span>, <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-c1">0.2</span>)</pre></div>
+<p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/18.1parallel_computing.ipynb">代码链接</a></p>
+<h2>3 数据并行的简单实现</h2>
+<ul>
+<li>首先构建模型</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
+<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+
+<span class="pl-c"># 定义模型</span>
+<span class="pl-k">def</span> <span class="pl-en">resnet18</span>(<span class="pl-s1">num_classes</span>, <span class="pl-s1">in_channels</span><span class="pl-c1">=</span><span class="pl-c1">1</span>):
+    <span class="pl-s">"""稍加修改的ResNet-18模型"""</span>
+    <span class="pl-k">def</span> <span class="pl-en">resnet_block</span>(<span class="pl-s1">in_channels</span>, <span class="pl-s1">out_channels</span>, <span class="pl-s1">num_residuals</span>,
+                    <span class="pl-s1">first_block</span><span class="pl-c1">=</span><span class="pl-c1">False</span>):
+        <span class="pl-s1">blk</span> <span class="pl-c1">=</span> []
+        <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_residuals</span>):
+            <span class="pl-k">if</span> <span class="pl-s1">i</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span> <span class="pl-c1">and</span> <span class="pl-c1">not</span> <span class="pl-s1">first_block</span>:
+                <span class="pl-s1">blk</span>.<span class="pl-c1">append</span>(<span class="pl-s1">d2l</span>.<span class="pl-c1">Residual</span>(<span class="pl-s1">out_channels</span>,
+                        <span class="pl-s1">use_1x1conv</span><span class="pl-c1">=</span><span class="pl-c1">True</span>, <span class="pl-s1">strides</span><span class="pl-c1">=</span><span class="pl-c1">2</span>))
+            <span class="pl-k">else</span>:
+                <span class="pl-s1">blk</span>.<span class="pl-c1">append</span>(<span class="pl-s1">d2l</span>.<span class="pl-c1">Residual</span>(<span class="pl-s1">out_channels</span>, <span class="pl-s1">out_channels</span>))
+        <span class="pl-k">return</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Sequential</span>(<span class="pl-c1">*</span><span class="pl-s1">blk</span>)
+
+    <span class="pl-c"># 该模型使用了更小的卷积核、步长和填充，而且删除了最大汇聚层</span>
+    <span class="pl-s1">net</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Sequential</span>(
+        <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-s1">in_channels</span>, <span class="pl-c1">64</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span><span class="pl-c1">3</span>, <span class="pl-s1">stride</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">padding</span><span class="pl-c1">=</span><span class="pl-c1">1</span>),
+        <span class="pl-s1">nn</span>.<span class="pl-c1">BatchNorm2d</span>(<span class="pl-c1">64</span>),
+        <span class="pl-s1">nn</span>.<span class="pl-c1">ReLU</span>())
+    <span class="pl-s1">net</span>.<span class="pl-c1">add_module</span>(<span class="pl-s">"resnet_block1"</span>, <span class="pl-en">resnet_block</span>(<span class="pl-c1">64</span>, <span class="pl-c1">64</span>, <span class="pl-c1">2</span>, <span class="pl-s1">first_block</span><span class="pl-c1">=</span><span class="pl-c1">True</span>))
+    <span class="pl-s1">net</span>.<span class="pl-c1">add_module</span>(<span class="pl-s">"resnet_block2"</span>, <span class="pl-en">resnet_block</span>(<span class="pl-c1">64</span>, <span class="pl-c1">128</span>, <span class="pl-c1">2</span>))
+    <span class="pl-s1">net</span>.<span class="pl-c1">add_module</span>(<span class="pl-s">"resnet_block3"</span>, <span class="pl-en">resnet_block</span>(<span class="pl-c1">128</span>, <span class="pl-c1">256</span>, <span class="pl-c1">2</span>))
+    <span class="pl-s1">net</span>.<span class="pl-c1">add_module</span>(<span class="pl-s">"resnet_block4"</span>, <span class="pl-en">resnet_block</span>(<span class="pl-c1">256</span>, <span class="pl-c1">512</span>, <span class="pl-c1">2</span>))
+    <span class="pl-s1">net</span>.<span class="pl-c1">add_module</span>(<span class="pl-s">"global_avg_pool"</span>, <span class="pl-s1">nn</span>.<span class="pl-c1">AdaptiveAvgPool2d</span>((<span class="pl-c1">1</span>,<span class="pl-c1">1</span>)))
+    <span class="pl-s1">net</span>.<span class="pl-c1">add_module</span>(<span class="pl-s">"fc"</span>, <span class="pl-s1">nn</span>.<span class="pl-c1">Sequential</span>(<span class="pl-s1">nn</span>.<span class="pl-c1">Flatten</span>(),
+    <span class="pl-s1">nn</span>.<span class="pl-c1">Linear</span>(<span class="pl-c1">512</span>, <span class="pl-s1">num_classes</span>)))
+    <span class="pl-k">return</span> <span class="pl-s1">net</span></pre></div>
+<ul>
+<li>网络初始化</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 网络初始化</span>
+<span class="pl-s1">net</span> <span class="pl-c1">=</span> <span class="pl-en">resnet18</span>(<span class="pl-c1">10</span>)
+<span class="pl-c"># 获取GPU列表</span>
+<span class="pl-s1">devices</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">try_all_gpus</span>()
+<span class="pl-c"># 我们将在训练代码实现中初始化网络</span></pre></div>
+<ul>
+<li>训练函数</li>
+</ul>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">train</span>(<span class="pl-s1">net</span>, <span class="pl-s1">num_gpus</span>, <span class="pl-s1">batch_size</span>, <span class="pl-s1">lr</span>):
+    <span class="pl-s1">train_iter</span>, <span class="pl-s1">test_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">load_data_fashion_mnist</span>(<span class="pl-s1">batch_size</span>)
+    <span class="pl-s1">devices</span> <span class="pl-c1">=</span> [<span class="pl-s1">d2l</span>.<span class="pl-c1">try_gpu</span>(<span class="pl-s1">i</span>) <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_gpus</span>)]
+    
+    <span class="pl-k">def</span> <span class="pl-en">init_weights</span>(<span class="pl-s1">m</span>):
+        <span class="pl-k">if</span> <span class="pl-en">type</span>(<span class="pl-s1">m</span>) <span class="pl-c1">in</span> [<span class="pl-s1">nn</span>.<span class="pl-c1">Linear</span>, <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>]:
+            <span class="pl-s1">nn</span>.<span class="pl-c1">init</span>.<span class="pl-c1">normal_</span>(<span class="pl-s1">m</span>.<span class="pl-c1">weight</span>, <span class="pl-s1">std</span><span class="pl-c1">=</span><span class="pl-c1">0.01</span>)
+    <span class="pl-s1">net</span>.<span class="pl-c1">apply</span>(<span class="pl-s1">init_weights</span>)
+    
+    <span class="pl-c"># 在多个GPU上设置模型</span>
+    <span class="pl-s1">net</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">DataParallel</span>(<span class="pl-s1">net</span>, <span class="pl-s1">device_ids</span><span class="pl-c1">=</span><span class="pl-s1">devices</span>) <span class="pl-c">#给定一个网络,给定GPU，然后将Net复制到每个GPU上</span>
+    <span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">optim</span>.<span class="pl-c1">SGD</span>(<span class="pl-s1">net</span>.<span class="pl-c1">parameters</span>(), <span class="pl-s1">lr</span>)
+    <span class="pl-s1">loss</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">CrossEntropyLoss</span>()
+    <span class="pl-s1">timer</span>, <span class="pl-s1">num_epochs</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">Timer</span>(), <span class="pl-c1">10</span>
+    <span class="pl-s1">animator</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">Animator</span>(<span class="pl-s">'epoch'</span>, <span class="pl-s">'test acc'</span>, <span class="pl-s1">xlim</span><span class="pl-c1">=</span>[<span class="pl-c1">1</span>, <span class="pl-s1">num_epochs</span>])
+    <span class="pl-k">for</span> <span class="pl-s1">epoch</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_epochs</span>):
+        <span class="pl-s1">net</span>.<span class="pl-c1">train</span>()
+        <span class="pl-s1">timer</span>.<span class="pl-c1">start</span>()
+        <span class="pl-k">for</span> <span class="pl-c1">X</span>, <span class="pl-s1">y</span> <span class="pl-c1">in</span> <span class="pl-s1">train_iter</span>:
+            <span class="pl-s1">trainer</span>.<span class="pl-c1">zero_grad</span>()
+            <span class="pl-c1">X</span>, <span class="pl-s1">y</span> <span class="pl-c1">=</span> <span class="pl-c1">X</span>.<span class="pl-c1">to</span>(<span class="pl-s1">devices</span>[<span class="pl-c1">0</span>]), <span class="pl-s1">y</span>.<span class="pl-c1">to</span>(<span class="pl-s1">devices</span>[<span class="pl-c1">0</span>])
+            <span class="pl-s1">l</span> <span class="pl-c1">=</span> <span class="pl-en">loss</span>(<span class="pl-en">net</span>(<span class="pl-c1">X</span>), <span class="pl-s1">y</span>)
+            <span class="pl-s1">l</span>.<span class="pl-c1">backward</span>()
+            <span class="pl-s1">trainer</span>.<span class="pl-c1">step</span>()
+        <span class="pl-s1">timer</span>.<span class="pl-c1">stop</span>()
+        <span class="pl-s1">animator</span>.<span class="pl-c1">add</span>(<span class="pl-s1">epoch</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, (<span class="pl-s1">d2l</span>.<span class="pl-c1">evaluate_accuracy_gpu</span>(<span class="pl-s1">net</span>, <span class="pl-s1">test_iter</span>),))
+    <span class="pl-en">print</span>(<span class="pl-s">f'测试精度：<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">animator</span>.<span class="pl-c1">Y</span>[<span class="pl-c1">0</span>][<span class="pl-c1">-</span><span class="pl-c1">1</span>]:.2f<span class="pl-kos">}</span></span>，<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">timer</span>.<span class="pl-c1">avg</span>():.1f<span class="pl-kos">}</span></span>秒/轮，'</span>
+        <span class="pl-s">f'在<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">str</span>(<span class="pl-s1">devices</span>)<span class="pl-kos">}</span></span>'</span>)
+
+<span class="pl-c"># 单卡训练</span>
+<span class="pl-en">train</span>(<span class="pl-s1">net</span>, <span class="pl-s1">num_gpus</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">256</span>, <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-c1">0.1</span>)
+<span class="pl-c"># 多卡训练</span>
+<span class="pl-en">train</span>(<span class="pl-s1">net</span>, <span class="pl-s1">num_gpus</span><span class="pl-c1">=</span><span class="pl-c1">2</span>, <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">512</span>, <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-c1">0.2</span>)</pre></div>
+<p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/18.2parallel_computing_simple.ipynb">代码链接</a></p></div>
+<div style="font-size:small;margin-top:8px;float:right;"></div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://kxmust.github.io">Ken</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","kxmust/kxmust.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>
