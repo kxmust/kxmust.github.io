@@ -1,5 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Tue, 29 Apr 2025 11:34:26 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习16-数据增广</title><link>https://kxmust.github.io/post/shen-du-xue-xi-16--shu-ju-zeng-guang.html</link><description># 数据增广
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Tue, 29 Apr 2025 13:26:27 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习17-迁移学习(微调)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-17--qian-yi-xue-xi-%28-wei-diao-%29.html</link><description># 迁移学习(微调)
+如果我们想要设计一个模型来做某个任务，而已经有类似的现有模型了，这时候我们可以对现有模型进行微调来完成新的任务
+
+## 微调 Fine-tuning
+我们可以将一个神经网络模型的分为两个部分，输出层用于对物品进行分类，其他层用来提取特征
+
+那么对于一个类似的任务，我们可以将已经训练好的模型的前N层拿过来，然后对最后的输出层进行修改，然后利用我们收集的数据进行微调，就能很好的完成新的任务。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-17--qian-yi-xue-xi-%28-wei-diao-%29.html</guid><pubDate>Tue, 29 Apr 2025 13:25:58 +0000</pubDate></item><item><title>深度学习16-数据增广</title><link>https://kxmust.github.io/post/shen-du-xue-xi-16--shu-ju-zeng-guang.html</link><description># 数据增广
 
 图像增广在对训练图像进行一系列的随机变化之后，生成相似但不同的训练样本，从而扩大了训练集的规模
 
