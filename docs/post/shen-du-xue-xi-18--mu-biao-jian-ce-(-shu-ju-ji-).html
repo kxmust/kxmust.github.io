@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/99197662?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="# 目标检测
+识别一张图片中的所有物体，比如多个狗或者猫，并且还要用方框标注出每个物体的位置
+
+**一个边缘框可以用四个数字来定义：**
+左上x，右上y， 右下x和右下y   （注意，一个一个图片的左上角为原点）
+左上x，右上y，宽和高
+
+**目标检测数据集：**
+一个图片中可能有多个类，所以一般用CSV文件来存
+一行表示一个物体
+所以一张图片可能需要多行来描述
+每一行的数据包括：
+图片名文件，物体类别和边缘框
+
+**常用的目标检测数据集：**
+COCO数据集 ：cocodataset.org  包含了80个常见类别，包含了大概330k图片，有1.5M物体
+
+## 1 边缘框的实现
+
+读入一张图片
+```python
+%matplotlib inline
+
+import torch
+from d2l import torch as d2l
+
+d2l.set_figsize()
+img = d2l.plt.imread('../Jupyter/img/catdog.jpg')
+d2l.plt.imshow(img);
+```
+
+![Image](https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622)
+
+框坐标的转换：
+```python
+# 定义在这两种表示之间进行转换的函数
+def box_corner_to_center(boxes):
+    '''从（左上，右下）转换到（中间，宽度，高度）'''
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    cx = (x1 + x2) / 2  # 得到中间点的坐标
+    cy = (y1 + y2) / 2
+
+    w = x2 - x1
+    h = y2 - y1
+
+    boxes = torch.stack((cx, cy, w, h), axis = -1)
+    return boxes
+
+def box_center_to_corner(boxes):
+    '''从（中间，宽度，高度）转换到（左上，右下）'''
+    # 图片左上角为零点,向下是y轴正方向
+    cx, cy, w, h = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h 
+
+    boxes = torch.stack((x1, y1, x2, y2), axis = -1)
+    return boxes
+```
+基于边缘框画出物体的位置：
+
+```python
+# bbox是边界框的英文缩写
+dog_bbox, cat_bbox = [60.0, 45.0, 378.0, 516.0], [400.0, 112.0, 655.0, 493.0]
+boxes = torch.tensor((dog_bbox, cat_bbox))
+box_center_to_corner(box_corner_to_center(boxes)) == boxes   # 测试一下转换函数
+
+def bbox_to_rect(bbox, color):
+    return d2l.plt.Rectangle(xy = (bbox[0], bbox[1]),
+                            width = bbox[2]-bbox[0],
+                            height = bbox[3] - bbox[1],
+                            edgecolor = color,
+                            linewidth = 2,
+                            fill = False)
+
+fig = d2l.plt.imshow(img)
+fig.axes.add_patch(bbox_to_rect(dog_bbox, 'blue'))
+fig.axes.add_patch(bbox_to_rect(cat_bbox, 'red'));
+```
+
+![Image](https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f)
+
+## 2 目标检测数据集(手动构造了一个小的数据集)
+
+下载和读取数据集
+
+```python
+#包含所有图像和CSV标签文件的香蕉检测数据集可以直接从互联网下载。">
+<meta property="og:title" content="深度学习18-目标检测(数据集)">
+<meta property="og:description" content="# 目标检测
+识别一张图片中的所有物体，比如多个狗或者猫，并且还要用方框标注出每个物体的位置
+
+**一个边缘框可以用四个数字来定义：**
+左上x，右上y， 右下x和右下y   （注意，一个一个图片的左上角为原点）
+左上x，右上y，宽和高
+
+**目标检测数据集：**
+一个图片中可能有多个类，所以一般用CSV文件来存
+一行表示一个物体
+所以一张图片可能需要多行来描述
+每一行的数据包括：
+图片名文件，物体类别和边缘框
+
+**常用的目标检测数据集：**
+COCO数据集 ：cocodataset.org  包含了80个常见类别，包含了大概330k图片，有1.5M物体
+
+## 1 边缘框的实现
+
+读入一张图片
+```python
+%matplotlib inline
+
+import torch
+from d2l import torch as d2l
+
+d2l.set_figsize()
+img = d2l.plt.imread('../Jupyter/img/catdog.jpg')
+d2l.plt.imshow(img);
+```
+
+![Image](https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622)
+
+框坐标的转换：
+```python
+# 定义在这两种表示之间进行转换的函数
+def box_corner_to_center(boxes):
+    '''从（左上，右下）转换到（中间，宽度，高度）'''
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    cx = (x1 + x2) / 2  # 得到中间点的坐标
+    cy = (y1 + y2) / 2
+
+    w = x2 - x1
+    h = y2 - y1
+
+    boxes = torch.stack((cx, cy, w, h), axis = -1)
+    return boxes
+
+def box_center_to_corner(boxes):
+    '''从（中间，宽度，高度）转换到（左上，右下）'''
+    # 图片左上角为零点,向下是y轴正方向
+    cx, cy, w, h = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h 
+
+    boxes = torch.stack((x1, y1, x2, y2), axis = -1)
+    return boxes
+```
+基于边缘框画出物体的位置：
+
+```python
+# bbox是边界框的英文缩写
+dog_bbox, cat_bbox = [60.0, 45.0, 378.0, 516.0], [400.0, 112.0, 655.0, 493.0]
+boxes = torch.tensor((dog_bbox, cat_bbox))
+box_center_to_corner(box_corner_to_center(boxes)) == boxes   # 测试一下转换函数
+
+def bbox_to_rect(bbox, color):
+    return d2l.plt.Rectangle(xy = (bbox[0], bbox[1]),
+                            width = bbox[2]-bbox[0],
+                            height = bbox[3] - bbox[1],
+                            edgecolor = color,
+                            linewidth = 2,
+                            fill = False)
+
+fig = d2l.plt.imshow(img)
+fig.axes.add_patch(bbox_to_rect(dog_bbox, 'blue'))
+fig.axes.add_patch(bbox_to_rect(cat_bbox, 'red'));
+```
+
+![Image](https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f)
+
+## 2 目标检测数据集(手动构造了一个小的数据集)
+
+下载和读取数据集
+
+```python
+#包含所有图像和CSV标签文件的香蕉检测数据集可以直接从互联网下载。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kxmust.github.io/post/shen-du-xue-xi-18--mu-biao-jian-ce-%28-shu-ju-ji-%29.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
+<title>深度学习18-目标检测(数据集)</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">深度学习18-目标检测(数据集)</h1>
+<div class="title-right">
+    <a href="https://kxmust.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/kxmust/kxmust.github.io/issues/19" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><h1>目标检测</h1>
+<p>识别一张图片中的所有物体，比如多个狗或者猫，并且还要用方框标注出每个物体的位置</p>
+<p><strong>一个边缘框可以用四个数字来定义：</strong><br>
+左上x，右上y， 右下x和右下y   （注意，一个一个图片的左上角为原点）<br>
+左上x，右上y，宽和高</p>
+<p><strong>目标检测数据集：</strong><br>
+一个图片中可能有多个类，所以一般用CSV文件来存<br>
+一行表示一个物体<br>
+所以一张图片可能需要多行来描述<br>
+每一行的数据包括：<br>
+图片名文件，物体类别和边缘框</p>
+<p><strong>常用的目标检测数据集：</strong><br>
+COCO数据集 ：cocodataset.org  包含了80个常见类别，包含了大概330k图片，有1.5M物体</p>
+<h2>1 边缘框的实现</h2>
+<p>读入一张图片</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">%</span><span class="pl-s1">matplotlib</span> <span class="pl-s1">inline</span>
+
+<span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+
+<span class="pl-s1">d2l</span>.<span class="pl-c1">set_figsize</span>()
+<span class="pl-s1">img</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imread</span>(<span class="pl-s">'../Jupyter/img/catdog.jpg'</span>)
+<span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>);</pre></div>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622"><img src="https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622" alt="Image" style="max-width: 100%;"></a></p>
+<p>框坐标的转换：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 定义在这两种表示之间进行转换的函数</span>
+<span class="pl-k">def</span> <span class="pl-en">box_corner_to_center</span>(<span class="pl-s1">boxes</span>):
+    <span class="pl-s">"""从（左上，右下）转换到（中间，宽度，高度）"""</span>
+    <span class="pl-s1">x1</span>, <span class="pl-s1">y1</span>, <span class="pl-s1">x2</span>, <span class="pl-s1">y2</span> <span class="pl-c1">=</span> <span class="pl-s1">boxes</span>[:, <span class="pl-c1">0</span>], <span class="pl-s1">boxes</span>[:, <span class="pl-c1">1</span>], <span class="pl-s1">boxes</span>[:, <span class="pl-c1">2</span>], <span class="pl-s1">boxes</span>[:, <span class="pl-c1">3</span>]
+    <span class="pl-s1">cx</span> <span class="pl-c1">=</span> (<span class="pl-s1">x1</span> <span class="pl-c1">+</span> <span class="pl-s1">x2</span>) <span class="pl-c1">/</span> <span class="pl-c1">2</span>  <span class="pl-c"># 得到中间点的坐标</span>
+    <span class="pl-s1">cy</span> <span class="pl-c1">=</span> (<span class="pl-s1">y1</span> <span class="pl-c1">+</span> <span class="pl-s1">y2</span>) <span class="pl-c1">/</span> <span class="pl-c1">2</span>
+
+    <span class="pl-s1">w</span> <span class="pl-c1">=</span> <span class="pl-s1">x2</span> <span class="pl-c1">-</span> <span class="pl-s1">x1</span>
+    <span class="pl-s1">h</span> <span class="pl-c1">=</span> <span class="pl-s1">y2</span> <span class="pl-c1">-</span> <span class="pl-s1">y1</span>
+
+    <span class="pl-s1">boxes</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>((<span class="pl-s1">cx</span>, <span class="pl-s1">cy</span>, <span class="pl-s1">w</span>, <span class="pl-s1">h</span>), <span class="pl-s1">axis</span> <span class="pl-c1">=</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">boxes</span>
+
+<span class="pl-k">def</span> <span class="pl-en">box_center_to_corner</span>(<span class="pl-s1">boxes</span>):
+    <span class="pl-s">"""从（中间，宽度，高度）转换到（左上，右下）"""</span>
+    <span class="pl-c"># 图片左上角为零点,向下是y轴正方向</span>
+    <span class="pl-s1">cx</span>, <span class="pl-s1">cy</span>, <span class="pl-s1">w</span>, <span class="pl-s1">h</span> <span class="pl-c1">=</span> <span class="pl-s1">boxes</span>[:, <span class="pl-c1">0</span>], <span class="pl-s1">boxes</span>[:, <span class="pl-c1">1</span>], <span class="pl-s1">boxes</span>[:, <span class="pl-c1">2</span>], <span class="pl-s1">boxes</span>[:, <span class="pl-c1">3</span>]
+    <span class="pl-s1">x1</span> <span class="pl-c1">=</span> <span class="pl-s1">cx</span> <span class="pl-c1">-</span> <span class="pl-c1">0.5</span> <span class="pl-c1">*</span> <span class="pl-s1">w</span>
+    <span class="pl-s1">y1</span> <span class="pl-c1">=</span> <span class="pl-s1">cy</span> <span class="pl-c1">-</span> <span class="pl-c1">0.5</span> <span class="pl-c1">*</span> <span class="pl-s1">h</span>
+    <span class="pl-s1">x2</span> <span class="pl-c1">=</span> <span class="pl-s1">cx</span> <span class="pl-c1">+</span> <span class="pl-c1">0.5</span> <span class="pl-c1">*</span> <span class="pl-s1">w</span>
+    <span class="pl-s1">y2</span> <span class="pl-c1">=</span> <span class="pl-s1">cy</span> <span class="pl-c1">+</span> <span class="pl-c1">0.5</span> <span class="pl-c1">*</span> <span class="pl-s1">h</span> 
+
+    <span class="pl-s1">boxes</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>((<span class="pl-s1">x1</span>, <span class="pl-s1">y1</span>, <span class="pl-s1">x2</span>, <span class="pl-s1">y2</span>), <span class="pl-s1">axis</span> <span class="pl-c1">=</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">boxes</span></pre></div>
+<p>基于边缘框画出物体的位置：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># bbox是边界框的英文缩写</span>
+<span class="pl-s1">dog_bbox</span>, <span class="pl-s1">cat_bbox</span> <span class="pl-c1">=</span> [<span class="pl-c1">60.0</span>, <span class="pl-c1">45.0</span>, <span class="pl-c1">378.0</span>, <span class="pl-c1">516.0</span>], [<span class="pl-c1">400.0</span>, <span class="pl-c1">112.0</span>, <span class="pl-c1">655.0</span>, <span class="pl-c1">493.0</span>]
+<span class="pl-s1">boxes</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>((<span class="pl-s1">dog_bbox</span>, <span class="pl-s1">cat_bbox</span>))
+<span class="pl-en">box_center_to_corner</span>(<span class="pl-en">box_corner_to_center</span>(<span class="pl-s1">boxes</span>)) <span class="pl-c1">==</span> <span class="pl-s1">boxes</span>   <span class="pl-c"># 测试一下转换函数</span>
+
+<span class="pl-k">def</span> <span class="pl-en">bbox_to_rect</span>(<span class="pl-s1">bbox</span>, <span class="pl-s1">color</span>):
+    <span class="pl-k">return</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">Rectangle</span>(<span class="pl-s1">xy</span> <span class="pl-c1">=</span> (<span class="pl-s1">bbox</span>[<span class="pl-c1">0</span>], <span class="pl-s1">bbox</span>[<span class="pl-c1">1</span>]),
+                            <span class="pl-s1">width</span> <span class="pl-c1">=</span> <span class="pl-s1">bbox</span>[<span class="pl-c1">2</span>]<span class="pl-c1">-</span><span class="pl-s1">bbox</span>[<span class="pl-c1">0</span>],
+                            <span class="pl-s1">height</span> <span class="pl-c1">=</span> <span class="pl-s1">bbox</span>[<span class="pl-c1">3</span>] <span class="pl-c1">-</span> <span class="pl-s1">bbox</span>[<span class="pl-c1">1</span>],
+                            <span class="pl-s1">edgecolor</span> <span class="pl-c1">=</span> <span class="pl-s1">color</span>,
+                            <span class="pl-s1">linewidth</span> <span class="pl-c1">=</span> <span class="pl-c1">2</span>,
+                            <span class="pl-s1">fill</span> <span class="pl-c1">=</span> <span class="pl-c1">False</span>)
+
+<span class="pl-s1">fig</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>)
+<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>.<span class="pl-c1">add_patch</span>(<span class="pl-en">bbox_to_rect</span>(<span class="pl-s1">dog_bbox</span>, <span class="pl-s">'blue'</span>))
+<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>.<span class="pl-c1">add_patch</span>(<span class="pl-en">bbox_to_rect</span>(<span class="pl-s1">cat_bbox</span>, <span class="pl-s">'red'</span>));</pre></div>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f"><img src="https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f" alt="Image" style="max-width: 100%;"></a></p>
+<h2>2 目标检测数据集(手动构造了一个小的数据集)</h2>
+<p>下载和读取数据集</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#包含所有图像和CSV标签文件的香蕉检测数据集可以直接从互联网下载。</span>
+<span class="pl-c1">%</span><span class="pl-s1">matplotlib</span> <span class="pl-s1">inline</span>
+<span class="pl-k">import</span> <span class="pl-s1">os</span>
+<span class="pl-k">import</span> <span class="pl-s1">pandas</span> <span class="pl-k">as</span> <span class="pl-s1">pd</span>
+<span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">import</span> <span class="pl-s1">torchvision</span>
+<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+
+<span class="pl-c">#@save</span>
+<span class="pl-s1">d2l</span>.<span class="pl-c1">DATA_HUB</span>[<span class="pl-s">'banana-detection'</span>] <span class="pl-c1">=</span> (
+    <span class="pl-s1">d2l</span>.<span class="pl-c1">DATA_URL</span> <span class="pl-c1">+</span> <span class="pl-s">'banana-detection.zip'</span>,
+    <span class="pl-s">'5de26c8fce5ccdea9f91267273464dc968d20d72'</span>)
+
+
+<span class="pl-c"># 读取数据集(这里的方法不常用，将所有图片读到内存里面，因为图片比较少)</span>
+<span class="pl-k">def</span> <span class="pl-en">read_data_bananas</span>(<span class="pl-s1">is_train</span><span class="pl-c1">=</span><span class="pl-c1">True</span>):
+    <span class="pl-s">"""读取香蕉检测数据集中的图像和标签"""</span>
+    <span class="pl-c"># 下载并解压数据集，返回数据集根目录</span>
+    <span class="pl-s1">data_dir</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">download_extract</span>(<span class="pl-s">'banana-detection'</span>) 
+    
+    <span class="pl-c"># 根据is_train参数选择训练集或验证集的label.csv文件</span>
+    <span class="pl-s1">csv_fname</span> <span class="pl-c1">=</span> <span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">data_dir</span>, <span class="pl-s">'bananas_train'</span> <span class="pl-k">if</span> <span class="pl-s1">is_train</span> <span class="pl-k">else</span> 
+                                   <span class="pl-s">'bananas_val'</span>, <span class="pl-s">'label.csv'</span>) 
+    
+    <span class="pl-s1">csv_data</span> <span class="pl-c1">=</span> <span class="pl-s1">pd</span>.<span class="pl-c1">read_csv</span>(<span class="pl-s1">csv_fname</span>)
+    <span class="pl-s1">csv_data</span> <span class="pl-c1">=</span> <span class="pl-s1">csv_data</span>.<span class="pl-c1">set_index</span>(<span class="pl-s">'img_name'</span>)
+    <span class="pl-s1">images</span>, <span class="pl-s1">targets</span> <span class="pl-c1">=</span> [], []
+    <span class="pl-k">for</span> <span class="pl-s1">img_name</span>, <span class="pl-s1">target</span> <span class="pl-c1">in</span> <span class="pl-s1">csv_data</span>.<span class="pl-c1">iterrows</span>():
+        <span class="pl-c"># 从images子目录中读取每张图片，使用torchvision.io.read_image加载为张量。</span>
+        <span class="pl-s1">images</span>.<span class="pl-c1">append</span>(<span class="pl-s1">torchvision</span>.<span class="pl-c1">io</span>.<span class="pl-c1">read_image</span>(
+            <span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">data_dir</span>, <span class="pl-s">'bananas_train'</span> <span class="pl-k">if</span> <span class="pl-s1">is_train</span> <span class="pl-k">else</span>
+                        <span class="pl-s">'bananas_val'</span>, <span class="pl-s">'images'</span>, <span class="pl-s">f'<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">img_name</span><span class="pl-kos">}</span></span>'</span>)
+        ))
+        <span class="pl-c"># 这里的target包含（类别，左上角x，左上角y，右下角x，右下角y），</span>
+        <span class="pl-c"># 其中所有图像都具有相同的香蕉类（索引为0）</span>
+        <span class="pl-s1">targets</span>.<span class="pl-c1">append</span>(<span class="pl-en">list</span>(<span class="pl-s1">target</span>))
+    <span class="pl-k">return</span> <span class="pl-s1">images</span>, <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>(<span class="pl-s1">targets</span>).<span class="pl-c1">unsqueeze</span>(<span class="pl-c1">1</span>)<span class="pl-c1">/</span><span class="pl-c1">256</span></pre></div>
+<p>一个数据集自定义Dataset实例</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">class</span> <span class="pl-v">BananasDataset</span>(<span class="pl-s1">torch</span>.<span class="pl-c1">utils</span>.<span class="pl-c1">data</span>.<span class="pl-c1">Dataset</span>):
+    <span class="pl-s">"""一个用于加载香蕉检测数据集的自定义数据集"""</span>
+    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">is_train</span>):
+        <span class="pl-s1">self</span>.<span class="pl-c1">features</span>, <span class="pl-s1">self</span>.<span class="pl-c1">labels</span> <span class="pl-c1">=</span> <span class="pl-en">read_data_bananas</span>(<span class="pl-s1">is_train</span>)
+        <span class="pl-en">print</span>(<span class="pl-s">'read '</span> <span class="pl-c1">+</span> <span class="pl-en">str</span>(<span class="pl-en">len</span>(<span class="pl-s1">self</span>.<span class="pl-c1">features</span>)) <span class="pl-c1">+</span> (<span class="pl-s">f' training examples'</span> <span class="pl-k">if</span>
+                    <span class="pl-s1">is_train</span> <span class="pl-k">else</span> <span class="pl-s">f' validation examples'</span>))
+
+    <span class="pl-c"># 读取第i个样品</span>
+    <span class="pl-k">def</span> <span class="pl-en">__getitem__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">idx</span>):
+        <span class="pl-k">return</span> (<span class="pl-s1">self</span>.<span class="pl-c1">features</span>[<span class="pl-s1">idx</span>].<span class="pl-c1">float</span>(), <span class="pl-s1">self</span>.<span class="pl-c1">labels</span>[<span class="pl-s1">idx</span>])
+
+    <span class="pl-c"># 返回读取的数据有多长</span>
+    <span class="pl-k">def</span> <span class="pl-en">__len__</span>(<span class="pl-s1">self</span>):
+        <span class="pl-k">return</span> <span class="pl-en">len</span>(<span class="pl-s1">self</span>.<span class="pl-c1">features</span>)</pre></div>
+<p>基于构建的实例，加载数据集，构建为迭代器</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">load_data_bananas</span>(<span class="pl-s1">batch_size</span>):
+    <span class="pl-s">"""加载香蕉检测数据集"""</span>
+    <span class="pl-s1">train_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">utils</span>.<span class="pl-c1">data</span>.<span class="pl-c1">DataLoader</span>(<span class="pl-en">BananasDataset</span>(<span class="pl-s1">is_train</span><span class="pl-c1">=</span><span class="pl-c1">True</span>),
+                <span class="pl-s1">batch_size</span>, <span class="pl-s1">shuffle</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
+    <span class="pl-s1">val_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">utils</span>.<span class="pl-c1">data</span>.<span class="pl-c1">DataLoader</span>(<span class="pl-en">BananasDataset</span>(<span class="pl-s1">is_train</span><span class="pl-c1">=</span><span class="pl-c1">False</span>),
+                <span class="pl-s1">batch_size</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">train_iter</span>, <span class="pl-s1">val_iter</span></pre></div>
+<p>打印一下</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">batch_size</span>, <span class="pl-s1">edge_size</span> <span class="pl-c1">=</span> <span class="pl-c1">32</span>, <span class="pl-c1">256</span>
+<span class="pl-s1">train_iter</span>, <span class="pl-s1">_</span> <span class="pl-c1">=</span> <span class="pl-en">load_data_bananas</span>(<span class="pl-s1">batch_size</span>)
+<span class="pl-s1">batch</span> <span class="pl-c1">=</span> <span class="pl-en">next</span>(<span class="pl-en">iter</span>(<span class="pl-s1">train_iter</span>))
+<span class="pl-s1">batch</span>[<span class="pl-c1">0</span>].<span class="pl-c1">shape</span>, <span class="pl-s1">batch</span>[<span class="pl-c1">1</span>].<span class="pl-c1">shape</span>
+<span class="pl-c"># 数据集中只有一个香蕉，因此标签只有一个种类[32,1,5]</span></pre></div>
+<p>输出：<br>
+read 1000 training examples<br>
+read 100 validation examples<br>
+(torch.Size([32, 3, 256, 256]), torch.Size([32, 1, 5]))</p>
+<p>显示一下边框：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">imgs</span> <span class="pl-c1">=</span> (<span class="pl-s1">batch</span>[<span class="pl-c1">0</span>][<span class="pl-c1">0</span>:<span class="pl-c1">10</span>].<span class="pl-c1">permute</span>(<span class="pl-c1">0</span>, <span class="pl-c1">2</span>, <span class="pl-c1">3</span>, <span class="pl-c1">1</span>)) <span class="pl-c1">/</span> <span class="pl-c1">255</span>
+<span class="pl-s1">axes</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">show_images</span>(<span class="pl-s1">imgs</span>, <span class="pl-c1">2</span>, <span class="pl-c1">5</span>, <span class="pl-s1">scale</span><span class="pl-c1">=</span><span class="pl-c1">2</span>)
+<span class="pl-k">for</span> <span class="pl-s1">ax</span>, <span class="pl-s1">label</span> <span class="pl-c1">in</span> <span class="pl-en">zip</span>(<span class="pl-s1">axes</span>, <span class="pl-s1">batch</span>[<span class="pl-c1">1</span>][<span class="pl-c1">0</span>:<span class="pl-c1">10</span>]):
+    <span class="pl-s1">d2l</span>.<span class="pl-c1">show_bboxes</span>(<span class="pl-s1">ax</span>, [<span class="pl-s1">label</span>[<span class="pl-c1">0</span>][<span class="pl-c1">1</span>:<span class="pl-c1">5</span>] <span class="pl-c1">*</span> <span class="pl-s1">edge_size</span>], <span class="pl-s1">colors</span><span class="pl-c1">=</span>[<span class="pl-s">'w'</span>])</pre></div>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/abaa7bf9-c66f-4136-aca3-a5252794a9c4"><img src="https://github.com/user-attachments/assets/abaa7bf9-c66f-4136-aca3-a5252794a9c4" alt="Image" style="max-width: 100%;"></a></p></div>
+<div style="font-size:small;margin-top:8px;float:right;"></div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://kxmust.github.io">Ken</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","kxmust/kxmust.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>

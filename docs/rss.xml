@@ -1,5 +1,93 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Tue, 29 Apr 2025 13:26:27 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习17-迁移学习(微调)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-17--qian-yi-xue-xi-%28-wei-diao-%29.html</link><description># 迁移学习(微调)
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Mon, 05 May 2025 09:24:36 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习18-目标检测(数据集)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-18--mu-biao-jian-ce-%28-shu-ju-ji-%29.html</link><description># 目标检测
+识别一张图片中的所有物体，比如多个狗或者猫，并且还要用方框标注出每个物体的位置
+
+**一个边缘框可以用四个数字来定义：**
+左上x，右上y， 右下x和右下y   （注意，一个一个图片的左上角为原点）
+左上x，右上y，宽和高
+
+**目标检测数据集：**
+一个图片中可能有多个类，所以一般用CSV文件来存
+一行表示一个物体
+所以一张图片可能需要多行来描述
+每一行的数据包括：
+图片名文件，物体类别和边缘框
+
+**常用的目标检测数据集：**
+COCO数据集 ：cocodataset.org  包含了80个常见类别，包含了大概330k图片，有1.5M物体
+
+## 1 边缘框的实现
+
+读入一张图片
+```python
+%matplotlib inline
+
+import torch
+from d2l import torch as d2l
+
+d2l.set_figsize()
+img = d2l.plt.imread('../Jupyter/img/catdog.jpg')
+d2l.plt.imshow(img);
+```
+
+![Image](https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622)
+
+框坐标的转换：
+```python
+# 定义在这两种表示之间进行转换的函数
+def box_corner_to_center(boxes):
+    '''从（左上，右下）转换到（中间，宽度，高度）'''
+    x1, y1, x2, y2 = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    cx = (x1 + x2) / 2  # 得到中间点的坐标
+    cy = (y1 + y2) / 2
+
+    w = x2 - x1
+    h = y2 - y1
+
+    boxes = torch.stack((cx, cy, w, h), axis = -1)
+    return boxes
+
+def box_center_to_corner(boxes):
+    '''从（中间，宽度，高度）转换到（左上，右下）'''
+    # 图片左上角为零点,向下是y轴正方向
+    cx, cy, w, h = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
+    x1 = cx - 0.5 * w
+    y1 = cy - 0.5 * h
+    x2 = cx + 0.5 * w
+    y2 = cy + 0.5 * h 
+
+    boxes = torch.stack((x1, y1, x2, y2), axis = -1)
+    return boxes
+```
+基于边缘框画出物体的位置：
+
+```python
+# bbox是边界框的英文缩写
+dog_bbox, cat_bbox = [60.0, 45.0, 378.0, 516.0], [400.0, 112.0, 655.0, 493.0]
+boxes = torch.tensor((dog_bbox, cat_bbox))
+box_center_to_corner(box_corner_to_center(boxes)) == boxes   # 测试一下转换函数
+
+def bbox_to_rect(bbox, color):
+    return d2l.plt.Rectangle(xy = (bbox[0], bbox[1]),
+                            width = bbox[2]-bbox[0],
+                            height = bbox[3] - bbox[1],
+                            edgecolor = color,
+                            linewidth = 2,
+                            fill = False)
+
+fig = d2l.plt.imshow(img)
+fig.axes.add_patch(bbox_to_rect(dog_bbox, 'blue'))
+fig.axes.add_patch(bbox_to_rect(cat_bbox, 'red'));
+```
+
+![Image](https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f)
+
+## 2 目标检测数据集(手动构造了一个小的数据集)
+
+下载和读取数据集
+
+```python
+#包含所有图像和CSV标签文件的香蕉检测数据集可以直接从互联网下载。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-18--mu-biao-jian-ce-%28-shu-ju-ji-%29.html</guid><pubDate>Mon, 05 May 2025 09:24:11 +0000</pubDate></item><item><title>深度学习17-迁移学习(微调)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-17--qian-yi-xue-xi-%28-wei-diao-%29.html</link><description># 迁移学习(微调)
 如果我们想要设计一个模型来做某个任务，而已经有类似的现有模型了，这时候我们可以对现有模型进行微调来完成新的任务
 
 ## 微调 Fine-tuning
