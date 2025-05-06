@@ -1,5 +1,83 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Mon, 05 May 2025 09:24:36 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习18-目标检测(数据集)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-18--mu-biao-jian-ce-%28-shu-ju-ji-%29.html</link><description># 目标检测
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Ken</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>Ken</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Tue, 06 May 2025 08:57:29 +0000</lastBuildDate><managingEditor>Ken</managingEditor><ttl>60</ttl><webMaster>Ken</webMaster><item><title>深度学习19-目标检测(锚框)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-19--mu-biao-jian-ce-%28-mao-kuang-%29.html</link><description># 目标检测（锚框）
+目标检测需要给出物体的边缘框
+一类目标检测算法是基于锚框（anchor box）的：
+- 提出多个被称为锚框的区域（边缘框），是对物体位置的猜测
+- 预测每个锚框里是否含有关注的物体
+- 如果这个锚框中还有关注的物体，则预测从这个锚框到真实边缘框的偏移
+
+## 1 锚框的生成
+
+### 1.1 计算两个框之间的相似度（IoU交并比）
+
+![Image](https://github.com/user-attachments/assets/d644019c-5775-4bbd-afaa-481849aa46b8)
+
+比如给定两个集合A和B，计算IoU过程如下：
+
+![Image](https://github.com/user-attachments/assets/734fd2aa-c3fd-4fc0-a755-e43349a6d636)
+
+对于图片来说，两个锚框的相似度就是重叠部分的像素值
+
+### 1.2 赋予锚框标号
+- 每个锚框是一个训练样本
+- 将每个锚框要么标注为背景，要么关联上一个真实的边缘框，计算其偏移用于训练
+- 我们可能会生成大量的锚框，这样会导致大量的负类样本
+
+比如生成了9个锚框，识别的物体个数为4，标注过程如下
+
+![Image](https://github.com/user-attachments/assets/834389c9-ccb6-431f-b199-99c0931afff5)
+
+- 对每个锚框计算与每个物体边缘框的IoU，会生成一个矩阵，如上图所示
+- 选出矩阵中最大值，比如是x23，它对应边缘框3，那么将该锚框用于预测边缘框3，然后删除它所在行和所在列的所有数据
+- 对于剩下的数据，继续选择最大值，然后关联上边缘框，继续下去，直到将所有边缘框都关联上了锚框
+
+值得注意的是：
+- 每读取一张图片，都要生成一次锚框，比如9个锚框，然后对其进行标号，生成训练样本
+- 赋予标号的算法有多种，上面只是其中常见的方法
+
+### 1.3 使用非极大值抑制(NMS)输出
+因为每个锚框会预测一个边缘框，其中有很多相似的预测，可以通过NMS来合并相似的预测
+- 选中是非背景类的最大预测值(最大预测值是指对类的预测的softmax值)
+- 去掉所有其他锚框和该锚框IoU值大于\theta的预测
+- 重复上述过程，直到所有预测框要么被选中，要么被去掉
+
+
+总结：
+- 一类目标检测算法基于锚框来预测
+- 首先生成大量锚框，并赋予标号，每个锚框作为一个样本进行训练
+- 在预测时，使用NMS来取消冗余的预测
+
+## 2 代码实现
+
+### 2.1 锚框的生成和显示
+
+锚框的生成（其中一种方法）
+以每一个像素为中心，生成不同高宽度的锚框
+
+![Image](https://github.com/user-attachments/assets/6b63a0a7-7883-41e9-9f9c-5f36e5a2897e)
+- s 表示锚框大小，占图片的百分之多少
+- r 锚框的高宽比
+- 每次生成的时候会给出多个s和多个r，但是不会一一组合，因为会生成大量的锚框，通常一般做法是用一个最合适的s和每个r进行一次组合，然后将后续的s与r1进行组合
+- 所以生成的锚框数量=s的个数+r的个数-1
+
+
+```python
+%matplotlib inline
+import torch
+from d2l import torch as d2l
+torch.set_printoptions(2) # 精简输出精度
+
+#@save
+# data 图片, size 锚框的大小，占图片的大小, ratio表示锚框的高宽比
+def multibox_prior(data, sizes, ratios):
+    '''生成以每个像素为中心具有不同形状的锚框'''
+    in_height, in_width = data.shape[-2:]
+    device, num_sizes, num_ratios = data.device, len(sizes), len(ratios)
+    boxes_per_pixel = (num_sizes + num_ratios - 1)
+    size_tensor = torch.tensor(sizes, device=device)
+    ratio_tensor = torch.tensor(ratios, device=device)
+    
+    # 为了将锚点移动到像素的中心，需要设置偏移量。</description><guid isPermaLink="true">https://kxmust.github.io/post/shen-du-xue-xi-19--mu-biao-jian-ce-%28-mao-kuang-%29.html</guid><pubDate>Tue, 06 May 2025 08:56:55 +0000</pubDate></item><item><title>深度学习18-目标检测(数据集)</title><link>https://kxmust.github.io/post/shen-du-xue-xi-18--mu-biao-jian-ce-%28-shu-ju-ji-%29.html</link><description># 目标检测
 识别一张图片中的所有物体，比如多个狗或者猫，并且还要用方框标注出每个物体的位置
 
 **一个边缘框可以用四个数字来定义：**
