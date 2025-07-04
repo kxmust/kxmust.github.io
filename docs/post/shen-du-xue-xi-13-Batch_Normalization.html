@@ -206,9 +206,9 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 这样的好处是在训练底部时可以避免变化顶部层</p>
 <h2>1 批量归一化</h2>
 <p>对于一个批量数据，计算均值和方差</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ae2e4981-d004-4362-ba02-249d5e4b4f6a"><img src="https://github.com/user-attachments/assets/ae2e4981-d004-4362-ba02-249d5e4b4f6a" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ae2e4981-d004-4362-ba02-249d5e4b4f6a"><img src="https://github.com/user-attachments/assets/ae2e4981-d004-4362-ba02-249d5e4b4f6a" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>利用均值和方差来进行归一化</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d56f9e07-9069-4606-9060-715ed691bee4"><img src="https://github.com/user-attachments/assets/d56f9e07-9069-4606-9060-715ed691bee4" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d56f9e07-9069-4606-9060-715ed691bee4"><img src="https://github.com/user-attachments/assets/d56f9e07-9069-4606-9060-715ed691bee4" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>特点：<br>
 可以学习的参数是\beta 和 \gamma<br>
 作用的位置：<br>
@@ -327,7 +327,7 @@ Linear output shape: 	 torch.Size([1, 10])</p>
 <p>结果：<br>
 loss 0.268, train acc 0.900, test acc 0.791<br>
 17149.0 examples/sec on cuda:0</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d7d4dcce-668a-4e96-96a4-732e1752d11f"><img src="https://github.com/user-attachments/assets/d7d4dcce-668a-4e96-96a4-732e1752d11f" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d7d4dcce-668a-4e96-96a4-732e1752d11f"><img src="https://github.com/user-attachments/assets/d7d4dcce-668a-4e96-96a4-732e1752d11f" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>查看\gamma和\beta的参数</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 查看gamma和beta的参数</span>
 <span class="pl-s1">net</span>[<span class="pl-c1">1</span>].<span class="pl-c1">gamma</span>.<span class="pl-c1">reshape</span>((<span class="pl-c1">-</span><span class="pl-c1">1</span>,)), <span class="pl-s1">net</span>[<span class="pl-c1">1</span>].<span class="pl-c1">beta</span>.<span class="pl-c1">reshape</span>((<span class="pl-c1">-</span><span class="pl-c1">1</span>,))</pre></div>
@@ -351,7 +351,7 @@ grad_fn=))</p>
 <p>结果：<br>
 loss 0.266, train acc 0.902, test acc 0.773<br>
 29665.3 examples/sec on cuda:0</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/72d27c26-41f2-43ad-89bd-6fa14e265c3b"><img src="https://github.com/user-attachments/assets/72d27c26-41f2-43ad-89bd-6fa14e265c3b" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/72d27c26-41f2-43ad-89bd-6fa14e265c3b"><img src="https://github.com/user-attachments/assets/72d27c26-41f2-43ad-89bd-6fa14e265c3b" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/16.1batch_normalization.ipynb">代码链接</a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 

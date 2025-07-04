@@ -282,7 +282,7 @@ COCO数据集 ：cocodataset.org  包含了80个常见类别，包含了大概33
 <span class="pl-s1">d2l</span>.<span class="pl-c1">set_figsize</span>()
 <span class="pl-s1">img</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imread</span>(<span class="pl-s">'../Jupyter/img/catdog.jpg'</span>)
 <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>);</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622"><img src="https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622"><img src="https://github.com/user-attachments/assets/1c5be667-5caa-4f8d-a72c-840b7fab2622" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>框坐标的转换：</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 定义在这两种表示之间进行转换的函数</span>
 <span class="pl-k">def</span> <span class="pl-en">box_corner_to_center</span>(<span class="pl-s1">boxes</span>):
@@ -325,7 +325,7 @@ COCO数据集 ：cocodataset.org  包含了80个常见类别，包含了大概33
 <span class="pl-s1">fig</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>)
 <span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>.<span class="pl-c1">add_patch</span>(<span class="pl-en">bbox_to_rect</span>(<span class="pl-s1">dog_bbox</span>, <span class="pl-s">'blue'</span>))
 <span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>.<span class="pl-c1">add_patch</span>(<span class="pl-en">bbox_to_rect</span>(<span class="pl-s1">cat_bbox</span>, <span class="pl-s">'red'</span>));</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f"><img src="https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f"><img src="https://github.com/user-attachments/assets/5f242be6-b3b6-4fac-bf2c-b66f24d3cb6f" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <h2>2 目标检测数据集(手动构造了一个小的数据集)</h2>
 <p>下载和读取数据集</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#包含所有图像和CSV标签文件的香蕉检测数据集可以直接从互联网下载。</span>
@@ -403,7 +403,7 @@ read 100 validation examples<br>
 <span class="pl-s1">axes</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">show_images</span>(<span class="pl-s1">imgs</span>, <span class="pl-c1">2</span>, <span class="pl-c1">5</span>, <span class="pl-s1">scale</span><span class="pl-c1">=</span><span class="pl-c1">2</span>)
 <span class="pl-k">for</span> <span class="pl-s1">ax</span>, <span class="pl-s1">label</span> <span class="pl-c1">in</span> <span class="pl-en">zip</span>(<span class="pl-s1">axes</span>, <span class="pl-s1">batch</span>[<span class="pl-c1">1</span>][<span class="pl-c1">0</span>:<span class="pl-c1">10</span>]):
     <span class="pl-s1">d2l</span>.<span class="pl-c1">show_bboxes</span>(<span class="pl-s1">ax</span>, [<span class="pl-s1">label</span>[<span class="pl-c1">0</span>][<span class="pl-c1">1</span>:<span class="pl-c1">5</span>] <span class="pl-c1">*</span> <span class="pl-s1">edge_size</span>], <span class="pl-s1">colors</span><span class="pl-c1">=</span>[<span class="pl-s">'w'</span>])</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/abaa7bf9-c66f-4136-aca3-a5252794a9c4"><img src="https://github.com/user-attachments/assets/abaa7bf9-c66f-4136-aca3-a5252794a9c4" alt="Image" style="max-width: 100%;"></a></p></div>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/abaa7bf9-c66f-4136-aca3-a5252794a9c4"><img src="https://github.com/user-attachments/assets/abaa7bf9-c66f-4136-aca3-a5252794a9c4" alt="Image" style="max-width: 100%; height: auto;"></a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 
 <button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>

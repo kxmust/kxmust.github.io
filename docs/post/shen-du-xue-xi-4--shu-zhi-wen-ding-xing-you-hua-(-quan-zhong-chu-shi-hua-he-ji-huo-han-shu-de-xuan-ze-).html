@@ -83,21 +83,21 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 每一层的输出独立于权重w<br>
 不考虑激活函数的情况下<br>
 这样的设定下，每一层的输出的均值为0.</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/c1da1866-ff84-4eed-ba35-13f0c29cdc68"><img src="https://github.com/user-attachments/assets/c1da1866-ff84-4eed-ba35-13f0c29cdc68" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/c1da1866-ff84-4eed-ba35-13f0c29cdc68"><img src="https://github.com/user-attachments/assets/c1da1866-ff84-4eed-ba35-13f0c29cdc68" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>方差的计算为：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/eee84726-3be0-49ab-a117-3173918dfd93"><img src="https://github.com/user-attachments/assets/eee84726-3be0-49ab-a117-3173918dfd93" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/eee84726-3be0-49ab-a117-3173918dfd93"><img src="https://github.com/user-attachments/assets/eee84726-3be0-49ab-a117-3173918dfd93" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>反向计算过程也是类似的：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/69d6a196-27a2-410a-917a-d77684347628"><img src="https://github.com/user-attachments/assets/69d6a196-27a2-410a-917a-d77684347628" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/69d6a196-27a2-410a-917a-d77684347628"><img src="https://github.com/user-attachments/assets/69d6a196-27a2-410a-917a-d77684347628" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>这样的设定下均值都为0，但是方差要为常数的话需要满足两个条件：<br>
 n_{t-1}<em>\gamma_t = 1<br>
 n_t</em>\gamma_t = 1</p>
 <p>但是这两个条件无法同时满足，因此Xavier初始化方法做了一个取舍：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/2d7e280e-4849-4c74-84a6-85ef7491c6bb"><img src="https://github.com/user-attachments/assets/2d7e280e-4849-4c74-84a6-85ef7491c6bb" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/2d7e280e-4849-4c74-84a6-85ef7491c6bb"><img src="https://github.com/user-attachments/assets/2d7e280e-4849-4c74-84a6-85ef7491c6bb" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <h2>2 激活函数的选择</h2>
 <p>引入激活函数后，如果需要让输出和梯度的均值和方差都为常数的话，激活函数必须为：<br>
 F(x)=x</p>
 <p>我们将常见的激活函数用泰勒展开：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/b5d7ac35-c3de-47d5-9b49-3b12d03c9ef5"><img src="https://github.com/user-attachments/assets/b5d7ac35-c3de-47d5-9b49-3b12d03c9ef5" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/b5d7ac35-c3de-47d5-9b49-3b12d03c9ef5"><img src="https://github.com/user-attachments/assets/b5d7ac35-c3de-47d5-9b49-3b12d03c9ef5" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>可以看到tanh和relu激活函数在0点附近时，是基本满足上述要求的，但是sigmoid激活函数不满足条件，需要对其进行修改。</p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 

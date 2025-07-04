@@ -110,7 +110,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 
 <span class="pl-s1">img</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">Image</span>.<span class="pl-c1">open</span>(<span class="pl-s">'../Jupyter/img/cat1.jpg'</span>)
 <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>);</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/a1448260-5c42-45a3-bb58-b313e8b37f43"><img src="https://github.com/user-attachments/assets/a1448260-5c42-45a3-bb58-b313e8b37f43" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/a1448260-5c42-45a3-bb58-b313e8b37f43"><img src="https://github.com/user-attachments/assets/a1448260-5c42-45a3-bb58-b313e8b37f43" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <ul>
 <li>可以对图片进行水平方向随机翻转</li>
 </ul>
@@ -121,13 +121,13 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 
 <span class="pl-c"># 水平方向随机翻转</span>
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">RandomHorizontalFlip</span>())</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f126d839-a2de-425a-bf4d-efd6b2d349b5"><img src="https://github.com/user-attachments/assets/f126d839-a2de-425a-bf4d-efd6b2d349b5" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f126d839-a2de-425a-bf4d-efd6b2d349b5"><img src="https://github.com/user-attachments/assets/f126d839-a2de-425a-bf4d-efd6b2d349b5" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <ul>
 <li>随机上下翻转</li>
 </ul>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 随机上下翻转</span>
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">RandomVerticalFlip</span>())</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/274938c1-3de1-4454-8788-712028430c29"><img src="https://github.com/user-attachments/assets/274938c1-3de1-4454-8788-712028430c29" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/274938c1-3de1-4454-8788-712028430c29"><img src="https://github.com/user-attachments/assets/274938c1-3de1-4454-8788-712028430c29" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <ul>
 <li>随机剪裁</li>
 </ul>
@@ -137,7 +137,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
     (<span class="pl-c1">200</span>, <span class="pl-c1">200</span>), <span class="pl-s1">scale</span><span class="pl-c1">=</span>(<span class="pl-c1">0.1</span>, <span class="pl-c1">1</span>), <span class="pl-s1">ratio</span><span class="pl-c1">=</span>(<span class="pl-c1">0.5</span>, <span class="pl-c1">2</span>)) 
 
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">shape_aug</span>)</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/da436af3-dce7-4169-9039-1f515f633e03"><img src="https://github.com/user-attachments/assets/da436af3-dce7-4169-9039-1f515f633e03" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/da436af3-dce7-4169-9039-1f515f633e03"><img src="https://github.com/user-attachments/assets/da436af3-dce7-4169-9039-1f515f633e03" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <ul>
 <li>改变图片颜色和色调</li>
 </ul>
@@ -145,7 +145,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <span class="pl-c"># brightness表示亮度上下0.5，contrast对比度，saturation饱和度, hue颜色</span>
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">ColorJitter</span>(
     <span class="pl-s1">brightness</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>, <span class="pl-s1">contrast</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">saturation</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">hue</span><span class="pl-c1">=</span><span class="pl-c1">0</span>))</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ff65266b-33b0-4206-a7a6-792fbdaf5699"><img src="https://github.com/user-attachments/assets/ff65266b-33b0-4206-a7a6-792fbdaf5699" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ff65266b-33b0-4206-a7a6-792fbdaf5699"><img src="https://github.com/user-attachments/assets/ff65266b-33b0-4206-a7a6-792fbdaf5699" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 改变色调</span>
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">ColorJitter</span>(
     <span class="pl-s1">brightness</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">contrast</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">saturation</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">hue</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>))
@@ -154,7 +154,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
     <span class="pl-s1">brightness</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>, <span class="pl-s1">contrast</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>, <span class="pl-s1">saturation</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>, <span class="pl-s1">hue</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>)
 
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">color_aug</span>)</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f4a804f5-b109-47bc-86ae-664be741619c"><img src="https://github.com/user-attachments/assets/f4a804f5-b109-47bc-86ae-664be741619c" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f4a804f5-b109-47bc-86ae-664be741619c"><img src="https://github.com/user-attachments/assets/f4a804f5-b109-47bc-86ae-664be741619c" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <ul>
 <li>结合各种增广</li>
 </ul>
@@ -162,7 +162,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <span class="pl-s1">augs</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">Compose</span>([
     <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">RandomHorizontalFlip</span>(), <span class="pl-s1">color_aug</span>, <span class="pl-s1">shape_aug</span>])
 <span class="pl-en">apply</span>(<span class="pl-s1">img</span>, <span class="pl-s1">augs</span>)</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/b8fe244d-6daa-48d7-aadd-89fb93339086"><img src="https://github.com/user-attachments/assets/b8fe244d-6daa-48d7-aadd-89fb93339086" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/b8fe244d-6daa-48d7-aadd-89fb93339086"><img src="https://github.com/user-attachments/assets/b8fe244d-6daa-48d7-aadd-89fb93339086" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <ul>
 <li>实际应用<br>
 <a href="https://github.com/kxmust/Deep_learning_note/blob/main/19.1data_augmentation.ipynb">代码链接</a></li>

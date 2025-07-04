@@ -104,19 +104,19 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <h3>1.1 残差块</h3>
 <p>通过串联一个层来改变函数类，我们希望能扩大函数类<br>
 残差块加入快速通道（右边）来得到f(x)=x+g(x)</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/8414e04e-57c9-4d19-829f-6d032d85ab66"><img src="https://github.com/user-attachments/assets/8414e04e-57c9-4d19-829f-6d032d85ab66" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/8414e04e-57c9-4d19-829f-6d032d85ab66"><img src="https://github.com/user-attachments/assets/8414e04e-57c9-4d19-829f-6d032d85ab66" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p><strong>可以这样理解：</strong><br>
 如果左边f(x)为新加的层，如果没有它的话，意味着这个层什么都没学到<br>
 但是下面的输入X还是会过去，到下一个网络<br>
 这样做的好处是，就算加了新的层，至少不会让模型的性能变差</p>
 <p>也可以理解为，这样设计利用残差的传递来让模型先拟合小网络。</p>
 <p>有两中残差块，第一个是输出维度不变，另一种来降低输出维度，高宽简单，但是增加通道数，残差部分也会加入1x1卷积来增加通道，这样才能相加</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/1a4ebc6a-785f-477a-909d-4f41e5b33814"><img src="https://github.com/user-attachments/assets/1a4ebc6a-785f-477a-909d-4f41e5b33814" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/1a4ebc6a-785f-477a-909d-4f41e5b33814"><img src="https://github.com/user-attachments/assets/1a4ebc6a-785f-477a-909d-4f41e5b33814" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>当然这个残差部分可以加在任何地方，比如在ReLU之后，或者卷积之后都可以</p>
 <h3>1.2 ResNet模型</h3>
 <p>通过不同的残差块来构建ResNet模型<br>
 下面是ResNet-18的模型</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/99ebf04d-5cef-4f08-a2fc-0c7047795922"><img src="https://github.com/user-attachments/assets/99ebf04d-5cef-4f08-a2fc-0c7047795922" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/99ebf04d-5cef-4f08-a2fc-0c7047795922"><img src="https://github.com/user-attachments/assets/99ebf04d-5cef-4f08-a2fc-0c7047795922" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>总结：<br>
 残差块使得很深的网络更加容易训练，甚至可以训练一千层</p>
 <p>残差网络对随后的深层神经网络设计产生了深远影响，无论是卷积类网络还是全连接网络</p>
@@ -212,7 +212,7 @@ Linear output shape:	 torch.Size([1, 10])</p>
 <p>结果：<br>
 loss 0.015, train acc 0.996, test acc 0.903<br>
 1749.4 examples/sec on cuda:0</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ec702370-965b-4dc6-8a8d-816b050d1510"><img src="https://github.com/user-attachments/assets/ec702370-965b-4dc6-8a8d-816b050d1510" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ec702370-965b-4dc6-8a8d-816b050d1510"><img src="https://github.com/user-attachments/assets/ec702370-965b-4dc6-8a8d-816b050d1510" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/17.1ResNet.ipynb">代码链接</a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 

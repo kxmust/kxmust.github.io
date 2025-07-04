@@ -91,11 +91,11 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p>NiN用1x1的卷积核来作用在每个像素位置上，类似一个全连接层，并且保留了空间结构。</p>
 <h2>1 NiN模型的结构</h2>
 <p>NiN和VGG块一样，会构建一个NiN块，这些块中有多个1x1卷积层</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ebdad306-c353-4172-a0a9-e955ba20129e"><img src="https://github.com/user-attachments/assets/ebdad306-c353-4172-a0a9-e955ba20129e" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ebdad306-c353-4172-a0a9-e955ba20129e"><img src="https://github.com/user-attachments/assets/ebdad306-c353-4172-a0a9-e955ba20129e" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <p>然后堆叠多个NiN块，最后通过全局平均池化层来得到最终的输出<br>
 全局平均池化就是将输出的多通道矩阵信息，取每个通道的平均值作为输出，可以实现类似全连接层的效果。</p>
 <p>它与VGG的主要区别如图：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/9dd592a5-03ce-417d-965f-dddc28d1bdaf"><img src="https://github.com/user-attachments/assets/9dd592a5-03ce-417d-965f-dddc28d1bdaf" alt="Image" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/9dd592a5-03ce-417d-965f-dddc28d1bdaf"><img src="https://github.com/user-attachments/assets/9dd592a5-03ce-417d-965f-dddc28d1bdaf" alt="Image" style="max-width: 100%; height: auto;"></a></p>
 <h2>2 NiN模型代码实现</h2>
 <p>首先构建NiN块</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
