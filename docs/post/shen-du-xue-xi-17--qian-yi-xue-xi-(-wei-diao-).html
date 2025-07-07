@@ -113,7 +113,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <li>向目标模型添加输出层，其输出数是目标数据集中的类别数。然后随机初始化该层的模型参数</li>
 <li>在目标数据集（如椅子数据集）上训练目标模型。输出层将从头开始进行训练，而所有其他层的参数将根据源模型的参数进行微调</li>
 </ul>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/e1835973-6aab-4368-858f-5a5b7780cd1a"><img src="https://github.com/user-attachments/assets/e1835973-6aab-4368-858f-5a5b7780cd1a" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/e1835973-6aab-4368-858f-5a5b7780cd1a"><img src="https://github.com/user-attachments/assets/e1835973-6aab-4368-858f-5a5b7780cd1a" alt="Image" style="max-width: 100%;"></a></p>
 <p>训练：<br>
 在微调中，使用了目标数据集进行正常训练，但是使用更强的正则化</p>
 <ul>
@@ -155,7 +155,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">hotdogs</span> <span class="pl-c1">=</span> [<span class="pl-s1">train_imgs</span>[<span class="pl-s1">i</span>][<span class="pl-c1">0</span>] <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">8</span>)]
 <span class="pl-s1">not_hotdogs</span> <span class="pl-c1">=</span> [<span class="pl-s1">train_imgs</span>[<span class="pl-c1">-</span><span class="pl-s1">i</span><span class="pl-c1">-</span> <span class="pl-c1">1</span>][<span class="pl-c1">0</span>] <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">8</span>)]
 <span class="pl-s1">d2l</span>.<span class="pl-c1">show_images</span>(<span class="pl-s1">hotdogs</span> <span class="pl-c1">+</span> <span class="pl-s1">not_hotdogs</span>, <span class="pl-c1">2</span>, <span class="pl-c1">8</span>, <span class="pl-s1">scale</span><span class="pl-c1">=</span><span class="pl-c1">1.4</span>);</pre></div>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/fd5713b8-03e7-4fa8-8186-ed71d38835a4"><img src="https://github.com/user-attachments/assets/fd5713b8-03e7-4fa8-8186-ed71d38835a4" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/fd5713b8-03e7-4fa8-8186-ed71d38835a4"><img src="https://github.com/user-attachments/assets/fd5713b8-03e7-4fa8-8186-ed71d38835a4" alt="Image" style="max-width: 100%;"></a></p>
 <ul>
 <li>数据增广</li>
 </ul>
@@ -221,7 +221,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p>结果：<br>
 loss 0.188, train acc 0.933, test acc 0.935<br>
 43.9 examples/sec on [device(type='cuda', index=0)]</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/afe12d4b-d118-4b83-bc0b-ea424d2a182c"><img src="https://github.com/user-attachments/assets/afe12d4b-d118-4b83-bc0b-ea424d2a182c" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/afe12d4b-d118-4b83-bc0b-ea424d2a182c"><img src="https://github.com/user-attachments/assets/afe12d4b-d118-4b83-bc0b-ea424d2a182c" alt="Image" style="max-width: 100%;"></a></p>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/20.1fine_tuning.ipynb">代码链接</a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 

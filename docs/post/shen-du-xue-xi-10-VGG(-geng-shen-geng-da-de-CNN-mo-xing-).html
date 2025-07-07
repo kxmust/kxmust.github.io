@@ -122,11 +122,11 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 将卷积层组合成块</p>
 <h2>1 VGG的结构</h2>
 <p>VGG块将多个卷积层和一个池化层组合成块：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d1f806b7-8baa-4021-9eab-d59295263eeb"><img src="https://github.com/user-attachments/assets/d1f806b7-8baa-4021-9eab-d59295263eeb" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d1f806b7-8baa-4021-9eab-d59295263eeb"><img src="https://github.com/user-attachments/assets/d1f806b7-8baa-4021-9eab-d59295263eeb" alt="Image" style="max-width: 100%;"></a></p>
 <p>它这里面用了3x3的卷积核，原因是在相同的计算开销下，3x3比5<br>
 x5的卷积核拥有更好的效果。</p>
 <p>用多个VGG块就可以构成一个VGG网络：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d9874633-54da-43ce-976f-5e25019bc5a6"><img src="https://github.com/user-attachments/assets/d9874633-54da-43ce-976f-5e25019bc5a6" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/d9874633-54da-43ce-976f-5e25019bc5a6"><img src="https://github.com/user-attachments/assets/d9874633-54da-43ce-976f-5e25019bc5a6" alt="Image" style="max-width: 100%;"></a></p>
 <p>VGG其实可以看作是一个更大更深的AlexNet</p>
 <p>总结：<br>
 VGG使用可重复使用的卷积块来构建深度卷积神经网络<br>
@@ -205,7 +205,7 @@ Linear output shape:	 torch.Size([1, 10])</p>
 <p>结果：<br>
 loss 0.170, train acc 0.938, test acc 0.925<br>
 614.9 examples/sec on cuda:0</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ef2d754a-c07a-4519-b677-5e25d8ffe155"><img src="https://github.com/user-attachments/assets/ef2d754a-c07a-4519-b677-5e25d8ffe155" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ef2d754a-c07a-4519-b677-5e25d8ffe155"><img src="https://github.com/user-attachments/assets/ef2d754a-c07a-4519-b677-5e25d8ffe155" alt="Image" style="max-width: 100%;"></a></p>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/13.1VGG.ipynb">代码链接</a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 

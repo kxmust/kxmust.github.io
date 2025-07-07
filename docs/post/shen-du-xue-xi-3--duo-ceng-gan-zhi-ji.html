@@ -85,13 +85,13 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <li>它不能拟合XOR函数，导致了第一次AI寒冬。</li>
 </ol>
 <p>算法如下：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/bbb128f7-6775-4a0d-b61d-adb060417070"><img src="https://github.com/user-attachments/assets/bbb128f7-6775-4a0d-b61d-adb060417070" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/bbb128f7-6775-4a0d-b61d-adb060417070"><img src="https://github.com/user-attachments/assets/bbb128f7-6775-4a0d-b61d-adb060417070" alt="Image" style="max-width: 100%;"></a></p>
 <h2>2 多层感知机</h2>
 <h3>2.1 原理</h3>
 <p>多层感知机使用隐藏层和激活函数来得到非线性模型。</p>
 <p>多层感知机可以学习两条分割线来解决XOR问题，两条分割线的分类结果相乘可以得到最终的分类结果。</p>
 <p>多层感知机包含出入层，隐藏层和输出层，隐藏层的大小是超参数，输入输出层的大小是求解的问题决定的。</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/897f8736-b84e-4d5f-a6a4-e7789b924cee"><img src="https://github.com/user-attachments/assets/897f8736-b84e-4d5f-a6a4-e7789b924cee" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/897f8736-b84e-4d5f-a6a4-e7789b924cee"><img src="https://github.com/user-attachments/assets/897f8736-b84e-4d5f-a6a4-e7789b924cee" alt="Image" style="max-width: 100%;"></a></p>
 <p>激活函数需要是非线性的，如果激活函数是线性的，那么拟合函数的输出还是线性函数。</p>
 <p><strong>当处理多分类问题时，输出用softmax来处理， 并且可以增加多个隐藏层来提高模型的拟合能力。</strong></p>
 <p>超参数：隐藏层数，每层隐藏层大小。</p>

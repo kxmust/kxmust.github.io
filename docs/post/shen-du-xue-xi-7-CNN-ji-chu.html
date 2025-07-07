@@ -105,7 +105,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p>​​卷积如何实现？​​<br>
 通过​​局部感受野​​：卷积核仅覆盖一个小窗口（如3×3或5×5像素），每次只处理窗口内的局部信息。例如，一个检测“边缘”的卷积核仅分析当前像素及其周围8个邻居的亮度变化。</p>
 <h3>1.3 卷积的计算过程</h3>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ff70a46e-a503-4d60-bf81-fae135372aff"><img src="https://github.com/user-attachments/assets/ff70a46e-a503-4d60-bf81-fae135372aff" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ff70a46e-a503-4d60-bf81-fae135372aff"><img src="https://github.com/user-attachments/assets/ff70a46e-a503-4d60-bf81-fae135372aff" alt="Image" style="max-width: 100%;"></a></p>
 <p>从0实现</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
 <span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
@@ -181,9 +181,9 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>).<span class="pl-c1">shape</span></pre></div>
 <p>通过设置卷积核大小，填充和步幅可以控制输出的维度<br>
 填充对输出维度的影响，计算过程如下：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/9ec1876f-05f5-46b6-80c1-b75aa20efdba"><img src="https://github.com/user-attachments/assets/9ec1876f-05f5-46b6-80c1-b75aa20efdba" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/9ec1876f-05f5-46b6-80c1-b75aa20efdba"><img src="https://github.com/user-attachments/assets/9ec1876f-05f5-46b6-80c1-b75aa20efdba" alt="Image" style="max-width: 100%;"></a></p>
 <p>步幅对输出维度的影响，计算过程如下：</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f3100731-9ec9-43fc-9935-5ea2f1541a47"><img src="https://github.com/user-attachments/assets/f3100731-9ec9-43fc-9935-5ea2f1541a47" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f3100731-9ec9-43fc-9935-5ea2f1541a47"><img src="https://github.com/user-attachments/assets/f3100731-9ec9-43fc-9935-5ea2f1541a47" alt="Image" style="max-width: 100%;"></a></p>
 <p>不同的卷积核大小，填充和步长的设置</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">conv2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span>(<span class="pl-c1">5</span>, <span class="pl-c1">3</span>), <span class="pl-s1">padding</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">1</span>))
 <span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>).<span class="pl-c1">shape</span>
@@ -197,11 +197,11 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/10.2CNN_parameters.ipynb">代码链接</a></p>
 <h3>2.2 通道数</h3>
 <p>多个通道数的计算过程</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/42f4edc3-7888-450e-9d84-8c12d3d2b887"><img src="https://github.com/user-attachments/assets/42f4edc3-7888-450e-9d84-8c12d3d2b887" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/42f4edc3-7888-450e-9d84-8c12d3d2b887"><img src="https://github.com/user-attachments/assets/42f4edc3-7888-450e-9d84-8c12d3d2b887" alt="Image" style="max-width: 100%;"></a></p>
 <p>可以通过增加多个三维卷积核来设定多个输出通道</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f07a2556-800d-45d4-88cf-6d5702367b94"><img src="https://github.com/user-attachments/assets/f07a2556-800d-45d4-88cf-6d5702367b94" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f07a2556-800d-45d4-88cf-6d5702367b94"><img src="https://github.com/user-attachments/assets/f07a2556-800d-45d4-88cf-6d5702367b94" alt="Image" style="max-width: 100%;"></a></p>
 <p>1x1的卷积核不会识别空间模式，只是融合通道，可以用作后续的特征融合</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/3a374491-65eb-4238-81e2-5036733ed3d9"><img src="https://github.com/user-attachments/assets/3a374491-65eb-4238-81e2-5036733ed3d9" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/3a374491-65eb-4238-81e2-5036733ed3d9"><img src="https://github.com/user-attachments/assets/3a374491-65eb-4238-81e2-5036733ed3d9" alt="Image" style="max-width: 100%;"></a></p>
 <p>多个输入通道的从0实现</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 多输入通道</span>
 <span class="pl-k">import</span> <span class="pl-s1">torch</span>
@@ -252,7 +252,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p>池化层返回窗口中最大或者平均值<br>
 并且同样有窗口大小，填充和步幅的超参数</p>
 <p>二维最大池化的过程</p>
-<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/6d55fbfc-202d-479c-b977-ec7e9d7b65e6"><img src="https://github.com/user-attachments/assets/6d55fbfc-202d-479c-b977-ec7e9d7b65e6" alt="Image" style="max-width: 100%; height: auto;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/6d55fbfc-202d-479c-b977-ec7e9d7b65e6"><img src="https://github.com/user-attachments/assets/6d55fbfc-202d-479c-b977-ec7e9d7b65e6" alt="Image" style="max-width: 100%;"></a></p>
 <p>从0开始实现池化层</p>
 <div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
 <span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
