@@ -29,7 +29,7 @@
 <meta property="og:url" content="https://kxmust.github.io/post/shen-du-xue-xi-17--qian-yi-xue-xi-%28-wei-diao-%29.html">
 <meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
 <title>深度学习17-迁移学习(微调)</title>
-<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
 
 
 </head>
@@ -53,17 +53,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
     body {padding: 8px;}
     .postTitle{font-size:24px;}
 }
-.copy-feedback {
-    display: none;
-    position: absolute;
-    top: 10px;
-    right: 50px;
-    color: var(--color-fg-on-emphasis);
-    background-color: var(--color-fg-muted);
-    border-radius: 3px;
-    padding: 5px 8px;
-    font-size: 12px;
-}
+
 </style>
 
 
@@ -136,88 +126,94 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <ul>
 <li>导入数据集</li>
 </ul>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">%</span><span class="pl-s1">matplotlib</span> <span class="pl-s1">inline</span>
-<span class="pl-k">import</span> <span class="pl-s1">os</span>
-<span class="pl-k">import</span> <span class="pl-s1">torch</span>
-<span class="pl-k">import</span> <span class="pl-s1">torchvision</span>
-<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
-<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+<pre lang="python" class="notranslate"><code class="notranslate">%matplotlib inline
+import os
+import torch
+import torchvision
+from torch import nn
+from d2l import torch as d2l
 
-<span class="pl-s1">d2l</span>.<span class="pl-c1">DATA_HUB</span>[<span class="pl-s">'hotdog'</span>] <span class="pl-c1">=</span> (<span class="pl-s1">d2l</span>.<span class="pl-c1">DATA_URL</span> <span class="pl-c1">+</span> <span class="pl-s">'hotdog.zip'</span>,
-            <span class="pl-s">'fba480ffa8aa7e0febbb511d181409f899b9baa5'</span>)
-<span class="pl-s1">data_dir</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">download_extract</span>(<span class="pl-s">'hotdog'</span>)   <span class="pl-c"># 一个热狗数据集</span>
+d2l.DATA_HUB['hotdog'] = (d2l.DATA_URL + 'hotdog.zip',
+            'fba480ffa8aa7e0febbb511d181409f899b9baa5')
+data_dir = d2l.download_extract('hotdog')   # 一个热狗数据集
 
-<span class="pl-s1">train_imgs</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">datasets</span>.<span class="pl-c1">ImageFolder</span>(<span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">data_dir</span>, <span class="pl-s">'train'</span>))
-<span class="pl-s1">test_imgs</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">datasets</span>.<span class="pl-c1">ImageFolder</span>(<span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">data_dir</span>, <span class="pl-s">'test'</span>))</pre></div>
+train_imgs = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'))
+test_imgs = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'))
+</code></pre>
 <ul>
 <li>显示图片</li>
 </ul>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">hotdogs</span> <span class="pl-c1">=</span> [<span class="pl-s1">train_imgs</span>[<span class="pl-s1">i</span>][<span class="pl-c1">0</span>] <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">8</span>)]
-<span class="pl-s1">not_hotdogs</span> <span class="pl-c1">=</span> [<span class="pl-s1">train_imgs</span>[<span class="pl-c1">-</span><span class="pl-s1">i</span><span class="pl-c1">-</span> <span class="pl-c1">1</span>][<span class="pl-c1">0</span>] <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">8</span>)]
-<span class="pl-s1">d2l</span>.<span class="pl-c1">show_images</span>(<span class="pl-s1">hotdogs</span> <span class="pl-c1">+</span> <span class="pl-s1">not_hotdogs</span>, <span class="pl-c1">2</span>, <span class="pl-c1">8</span>, <span class="pl-s1">scale</span><span class="pl-c1">=</span><span class="pl-c1">1.4</span>);</pre></div>
+<pre lang="python" class="notranslate"><code class="notranslate">hotdogs = [train_imgs[i][0] for i in range(8)]
+not_hotdogs = [train_imgs[-i- 1][0] for i in range(8)]
+d2l.show_images(hotdogs + not_hotdogs, 2, 8, scale=1.4);
+</code></pre>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/fd5713b8-03e7-4fa8-8186-ed71d38835a4"><img src="https://github.com/user-attachments/assets/fd5713b8-03e7-4fa8-8186-ed71d38835a4" alt="Image" style="max-width: 100%;"></a></p>
 <ul>
 <li>数据增广</li>
 </ul>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 使用RGB通道的均值和标准差，以标准化每个通道</span>
-<span class="pl-s1">normalize</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">Normalize</span>(
-        [<span class="pl-c1">0.485</span>, <span class="pl-c1">0.456</span>, <span class="pl-c1">0.406</span>], [<span class="pl-c1">0.229</span>, <span class="pl-c1">0.224</span>, <span class="pl-c1">0.225</span>])
+<pre lang="python" class="notranslate"><code class="notranslate"># 使用RGB通道的均值和标准差，以标准化每个通道
+normalize = torchvision.transforms.Normalize(
+        [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
-<span class="pl-c"># 数据增广,做normalize的原因是ImageNet上做了这个事情</span>
-<span class="pl-s1">train_augs</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">Compose</span>([
-        <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">RandomResizedCrop</span>(<span class="pl-c1">224</span>),   <span class="pl-c"># ImageNet是224,我们用了它上面训练好的模型做微调</span>
-        <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">RandomHorizontalFlip</span>(),
-        <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">ToTensor</span>(),
-        <span class="pl-s1">normalize</span>])
+# 数据增广,做normalize的原因是ImageNet上做了这个事情
+train_augs = torchvision.transforms.Compose([
+        torchvision.transforms.RandomResizedCrop(224),   # ImageNet是224,我们用了它上面训练好的模型做微调
+        torchvision.transforms.RandomHorizontalFlip(),
+        torchvision.transforms.ToTensor(),
+        normalize])
 
-<span class="pl-c"># 测试数据的增广</span>
-<span class="pl-s1">test_augs</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">Compose</span>([
-        <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">Resize</span>([<span class="pl-c1">256</span>, <span class="pl-c1">256</span>]),
-        <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">CenterCrop</span>(<span class="pl-c1">224</span>),
-        <span class="pl-s1">torchvision</span>.<span class="pl-c1">transforms</span>.<span class="pl-c1">ToTensor</span>(),
-        <span class="pl-s1">normalize</span>])</pre></div>
+# 测试数据的增广
+test_augs = torchvision.transforms.Compose([
+        torchvision.transforms.Resize([256, 256]),
+        torchvision.transforms.CenterCrop(224),
+        torchvision.transforms.ToTensor(),
+        normalize])
+</code></pre>
 <ul>
 <li>定义模型</li>
 </ul>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 定义和初始化模型</span>
-<span class="pl-c">#pretrained_net = torchvision.models.resnet18(pretrained=True)  # 拿到ResNet18的模型，并且拿到训练好的参数</span>
-<span class="pl-s1">pretrained_net</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">models</span>.<span class="pl-c1">resnet18</span>(<span class="pl-s1">weights</span><span class="pl-c1">=</span><span class="pl-s1">torchvision</span>.<span class="pl-c1">models</span>.<span class="pl-c1">ResNet18_Weights</span>.<span class="pl-c1">DEFAULT</span>)
-<span class="pl-s1">pretrained_net</span>.<span class="pl-c1">fc</span>  <span class="pl-c"># 最后一层输出层</span>
+<pre lang="python" class="notranslate"><code class="notranslate"># 定义和初始化模型
+#pretrained_net = torchvision.models.resnet18(pretrained=True)  # 拿到ResNet18的模型，并且拿到训练好的参数
+pretrained_net = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
+pretrained_net.fc  # 最后一层输出层
 
-<span class="pl-s1">finetune_net</span> <span class="pl-c1">=</span> <span class="pl-s1">torchvision</span>.<span class="pl-c1">models</span>.<span class="pl-c1">resnet18</span>(<span class="pl-s1">weights</span><span class="pl-c1">=</span><span class="pl-s1">torchvision</span>.<span class="pl-c1">models</span>.<span class="pl-c1">ResNet18_Weights</span>.<span class="pl-c1">DEFAULT</span>)
-<span class="pl-s1">finetune_net</span>.<span class="pl-c1">fc</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Linear</span>(<span class="pl-s1">finetune_net</span>.<span class="pl-c1">fc</span>.<span class="pl-c1">in_features</span>, <span class="pl-c1">2</span>)  <span class="pl-c"># 将输出层修改为自己需要的层</span>
-<span class="pl-s1">nn</span>.<span class="pl-c1">init</span>.<span class="pl-c1">xavier_uniform_</span>(<span class="pl-s1">finetune_net</span>.<span class="pl-c1">fc</span>.<span class="pl-c1">weight</span>);  <span class="pl-c"># 对最后一层的权重进行初始化</span></pre></div>
+finetune_net = torchvision.models.resnet18(weights=torchvision.models.ResNet18_Weights.DEFAULT)
+finetune_net.fc = nn.Linear(finetune_net.fc.in_features, 2)  # 将输出层修改为自己需要的层
+nn.init.xavier_uniform_(finetune_net.fc.weight);  # 对最后一层的权重进行初始化
+</code></pre>
 <ul>
 <li>定义训练函数（前N层学习率低，最后输出层学习率高）</li>
 </ul>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 如果param_group=True，输出层中的模型参数将使用十倍的学习率</span>
-<span class="pl-k">def</span> <span class="pl-en">train_fine_tuning</span>(<span class="pl-s1">net</span>, <span class="pl-s1">learning_rate</span>, <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">128</span>, <span class="pl-s1">num_epochs</span><span class="pl-c1">=</span><span class="pl-c1">5</span>,
-            <span class="pl-s1">param_group</span><span class="pl-c1">=</span><span class="pl-c1">True</span>):
-    <span class="pl-s1">train_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">utils</span>.<span class="pl-c1">data</span>.<span class="pl-c1">DataLoader</span>(<span class="pl-s1">torchvision</span>.<span class="pl-c1">datasets</span>.<span class="pl-c1">ImageFolder</span>(
-            <span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">data_dir</span>, <span class="pl-s">'train'</span>), <span class="pl-s1">transform</span><span class="pl-c1">=</span><span class="pl-s1">train_augs</span>),
-            <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-s1">batch_size</span>, <span class="pl-s1">shuffle</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
-    <span class="pl-s1">test_iter</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">utils</span>.<span class="pl-c1">data</span>.<span class="pl-c1">DataLoader</span>(<span class="pl-s1">torchvision</span>.<span class="pl-c1">datasets</span>.<span class="pl-c1">ImageFolder</span>(
-            <span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">data_dir</span>, <span class="pl-s">'test'</span>), <span class="pl-s1">transform</span><span class="pl-c1">=</span><span class="pl-s1">test_augs</span>),
-            <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-s1">batch_size</span>)
-    <span class="pl-s1">devices</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">try_all_gpus</span>()
-    <span class="pl-s1">loss</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">CrossEntropyLoss</span>(<span class="pl-s1">reduction</span><span class="pl-c1">=</span><span class="pl-s">"none"</span>)
-    <span class="pl-k">if</span> <span class="pl-s1">param_group</span>:
-        <span class="pl-s1">params_1x</span> <span class="pl-c1">=</span> [<span class="pl-s1">param</span> <span class="pl-k">for</span> <span class="pl-s1">name</span>, <span class="pl-s1">param</span> <span class="pl-c1">in</span> <span class="pl-s1">net</span>.<span class="pl-c1">named_parameters</span>()
-                <span class="pl-k">if</span> <span class="pl-s1">name</span> <span class="pl-c1"><span class="pl-c1">not</span> <span class="pl-c1">in</span></span> [<span class="pl-s">"fc.weight"</span>, <span class="pl-s">"fc.bias"</span>]]
-        <span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">optim</span>.<span class="pl-c1">SGD</span>([{<span class="pl-s">'params'</span>: <span class="pl-s1">params_1x</span>},
-                {<span class="pl-s">'params'</span>: <span class="pl-s1">net</span>.<span class="pl-c1">fc</span>.<span class="pl-c1">parameters</span>(),   <span class="pl-c"># 输出层中的模型使用10倍的学习率</span>
-                <span class="pl-s">'lr'</span>: <span class="pl-s1">learning_rate</span> <span class="pl-c1">*</span> <span class="pl-c1">10</span>}],
-                <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-s1">learning_rate</span>, <span class="pl-s1">weight_decay</span><span class="pl-c1">=</span><span class="pl-c1">0.001</span>)
-    <span class="pl-k">else</span>:
-        <span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">optim</span>.<span class="pl-c1">SGD</span>(<span class="pl-s1">net</span>.<span class="pl-c1">parameters</span>(), <span class="pl-s1">lr</span><span class="pl-c1">=</span><span class="pl-s1">learning_rate</span>,
-                        <span class="pl-s1">weight_decay</span><span class="pl-c1">=</span><span class="pl-c1">0.001</span>)
+<pre lang="python" class="notranslate"><code class="notranslate"># 如果param_group=True，输出层中的模型参数将使用十倍的学习率
+def train_fine_tuning(net, learning_rate, batch_size=128, num_epochs=5,
+            param_group=True):
+    train_iter = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
+            os.path.join(data_dir, 'train'), transform=train_augs),
+            batch_size=batch_size, shuffle=True)
+    test_iter = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
+            os.path.join(data_dir, 'test'), transform=test_augs),
+            batch_size=batch_size)
+    devices = d2l.try_all_gpus()
+    loss = nn.CrossEntropyLoss(reduction="none")
+    if param_group:
+        params_1x = [param for name, param in net.named_parameters()
+                if name not in ["fc.weight", "fc.bias"]]
+        trainer = torch.optim.SGD([{'params': params_1x},
+                {'params': net.fc.parameters(),   # 输出层中的模型使用10倍的学习率
+                'lr': learning_rate * 10}],
+                lr=learning_rate, weight_decay=0.001)
+    else:
+        trainer = torch.optim.SGD(net.parameters(), lr=learning_rate,
+                        weight_decay=0.001)
 
-    <span class="pl-s1">d2l</span>.<span class="pl-c1">train_ch13</span>(<span class="pl-s1">net</span>, <span class="pl-s1">train_iter</span>, <span class="pl-s1">test_iter</span>, <span class="pl-s1">loss</span>, <span class="pl-s1">trainer</span>, <span class="pl-s1">num_epochs</span>,
-         <span class="pl-s1">devices</span>)</pre></div>
+    d2l.train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs,
+         devices)
+</code></pre>
 <ul>
 <li>开始训练，设置一个很小的学习率</li>
 </ul>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-en">train_fine_tuning</span>(<span class="pl-s1">finetune_net</span>, <span class="pl-c1">5e-5</span>)  <span class="pl-c"># 给一个很小的学习率</span></pre></div>
+<pre lang="python" class="notranslate"><code class="notranslate">train_fine_tuning(finetune_net, 5e-5)  # 给一个很小的学习率
+</code></pre>
 <p>结果：<br>
 loss 0.188, train acc 0.933, test acc 0.935<br>
 43.9 examples/sec on [device(type='cuda', index=0)]</p>
@@ -247,7 +243,7 @@ if(""!=""){
 </script></div>
 </body>
 <script>
-var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
 var utterancesLoad=0;
 
 let themeSettings={
@@ -320,70 +316,7 @@ function iFrameLoading(){
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const createClipboardHTML = (codeContent, additionalClasses = '') => `
-        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
-        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
-            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
-                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
-                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
-            </clipboard-copy>
-            <div class="copy-feedback">Copied!</div>
-        </div>
-    `;
 
-    const handleCodeElements = (selector = '') => {
-        document.querySelectorAll(selector).forEach(codeElement => {
-            const codeContent = codeElement.innerHTML;
-            const newStructure = document.createElement('div');
-            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
-            newStructure.innerHTML = createClipboardHTML(codeContent);
-
-            const parentElement = codeElement.parentElement;
-            if (selector.includes('highlight')) {
-                parentElement.insertBefore(newStructure, codeElement.nextSibling);
-                parentElement.removeChild(codeElement);
-            } else {
-                parentElement.parentElement.replaceChild(newStructure, parentElement);
-            }
-        });
-    };
-
-    handleCodeElements('pre.notranslate > code.notranslate');
-    handleCodeElements('div.highlight > pre.notranslate');
-
-    let currentFeedback = null;
-    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
-        copyButton.addEventListener('click', () => {
-            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
-            const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = codeContent;
-            document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextArea);
-
-            const copyIcon = copyButton.querySelector('.octicon-copy');
-            const checkIcon = copyButton.querySelector('.octicon-check');
-            const copyFeedback = copyButton.nextElementSibling;
-
-            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
-            currentFeedback = copyFeedback;
-
-            copyIcon.classList.add('d-none');
-            checkIcon.classList.remove('d-none');
-            copyFeedback.style.display = 'block';
-            copyButton.style.borderColor = 'var(--color-success-fg)';
-
-            setTimeout(() => {
-                copyIcon.classList.remove('d-none');
-                checkIcon.classList.add('d-none');
-                copyFeedback.style.display = 'none';
-                copyButton.style.borderColor = '';
-            }, 2000);
-        });
-    });
-});
 
 </script>
 
