@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/99197662?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="微电网是智能电网的核心组成部分， 实现微电网能源的智能化调度可以极大提高可再生能源利用率，降低用户的用电费用，减少主电网的供电压力，是实现传统电网向智能电网变革的必经之路。">
+<meta property="og:title" content="住宅微电网 (1)：一个简单的住宅微电网问题">
+<meta property="og:description" content="微电网是智能电网的核心组成部分， 实现微电网能源的智能化调度可以极大提高可再生能源利用率，降低用户的用电费用，减少主电网的供电压力，是实现传统电网向智能电网变革的必经之路。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kxmust.github.io/post/zhu-zhai-wei-dian-wang-%20%281%29%EF%BC%9A-yi-ge-jian-dan-de-zhu-zhai-wei-dian-wang-wen-ti.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
+<title>住宅微电网 (1)：一个简单的住宅微电网问题</title>
+
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">住宅微电网 (1)：一个简单的住宅微电网问题</h1>
+<div class="title-right">
+    <a href="https://kxmust.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/kxmust/kxmust.github.io/issues/21" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><p>微电网是智能电网的核心组成部分， 实现微电网能源的智能化调度可以极大提高可再生能源利用率，降低用户的用电费用，减少主电网的供电压力，是实现传统电网向智能电网变革的必经之路。下面用一个简单的住宅微电网来描述微电网能源管理的原理和求解过程。</p>
+<h2>1. 问题描述</h2>
+<p>在学习微电网能源管理之前必须要了解优化的核心问题是什么？下面以一个简单的住宅微电网为例来进行描述。如图 1 所示，在这个住宅微电网中包含了以下组件：<br>
+<strong>(1)光伏面板</strong>：作为可再生能源的代表，是能源的供应者。<br>
+<strong>(2)用电负载</strong>：是能源的消耗者。<br>
+<strong>(3)储能系统</strong>：由于可再生能源间歇性的特点，为了保障能源的供应安全，通常会安装储能系统来储存能源，便于在能源不足时释放能源，保障能源的供应安全。在储能系统进行充电时，作为能源的消耗者，在储能系统进行放电时，作为能源的供应者。<br>
+<strong>(4)主电网</strong>：作为能源的额外补充，当能源不足时，可以从主电网中购入能源来满足能源需求。当有多余的能源时，也可以卖出能源给主电网来获得收益。</p>
+<div>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/518475b2-9b93-4fb0-b335-2d1ebf60b30a"><img src="https://github.com/user-attachments/assets/518475b2-9b93-4fb0-b335-2d1ebf60b30a" alt="描述文本" width="500" height="300" style="max-width: 100%; height: auto; max-height: 300px;"></a>
+  <p>图 1：一个简单的住宅微电网</p>
+</div>
+<p>我们将上述的组件抽象出来，构建出我们的能源控制模型，结构如图 2 所示。在每个时刻，能源管理系统会收到来自光伏面板、用电负载、储能系统和主电网的相关信息。能源管理系统会基于这些信息，智能化调度储能系统的充放电功率以及与主电网的交易量，来实现可再生能源的最大化利用，降低用户的用电成本。</p>
+<blockquote>
+<p>举一个简单的智能化例子，比如在电价较高时间段，光伏面板生成的能源不足以满足负载时，可以优先从储能系统中放出能源来满足负载需求，降低用电费用。当电价较低时，或者光伏面板的发电功率较高时，可以在满足负载需求的同时，优先存储能源到储能系统，用于后续用电高峰时的储备能源。</p>
+</blockquote>
+<p>我们的优化目标就是构建一个可以根据输入信息，智能化调度储能系统和交易量的能源管理系统，来提高能源利用效率，在保障用电负载的同时减少用户的用电费用，实现最优的经济化调度。</p>
+<div>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f2f0c4af-b593-4979-b724-4aea8906375b"><img src="https://github.com/user-attachments/assets/f2f0c4af-b593-4979-b724-4aea8906375b" alt="描述文本" width="400" height="600" style="max-width: 100%; height: auto; max-height: 600px;"></a>
+  <p>图 2：住宅微电网的控制模型架构</p>
+</div>
+<h2>2. 组件和相关约束</h2>
+<h3>2.1 光伏面板</h3>
+<p>光伏的发电功率和很多因素有关，包括光伏面板的属性以及安装角度、太阳的辐射强度、温度、是否有遮蔽等。我们的目标是构建一个基于数据的能源管理系统，因此不涉及对光伏面板进行建模。光伏面板的相关约束如下：<br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/26fc32d67bae8b9e6ff434578f0198f88a65049352d05142b512c4759b998666/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f2673706163653b305c6c652673706163653b505e7b70767d5f745c6c652673706163653b505e7b70767d5f7b6d61787d283129"><img src="https://camo.githubusercontent.com/26fc32d67bae8b9e6ff434578f0198f88a65049352d05142b512c4759b998666/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f2673706163653b305c6c652673706163653b505e7b70767d5f745c6c652673706163653b505e7b70767d5f7b6d61787d283129" title=" 0\le P^{pv}_t\le P^{pv}_{max}(1)" data-canonical-src="https://latex.codecogs.com/svg.image?&amp;space;0\le&amp;space;P^{pv}_t\le&amp;space;P^{pv}_{max}(1)" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/3fb88f9437aa4217ca41321e885b785bf151ff0775f132619cb33b23acaaa3d8/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e7b70767d5f742673706163653b"><img src="https://camo.githubusercontent.com/3fb88f9437aa4217ca41321e885b785bf151ff0775f132619cb33b23acaaa3d8/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e7b70767d5f742673706163653b" title="P^{pv}_t " data-canonical-src="https://latex.codecogs.com/svg.image?P^{pv}_t&amp;space;" style="max-width: 100%;"></a>表示光伏面板在 t 时刻的发电功率，<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/eb9d5a6f2ce8e9c7f9f029810e40bad910411f73ca6b3fdd3a64e2d2024e313e/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e7b70767d5f7b6d61787d"><img src="https://camo.githubusercontent.com/eb9d5a6f2ce8e9c7f9f029810e40bad910411f73ca6b3fdd3a64e2d2024e313e/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e7b70767d5f7b6d61787d" title="P^{pv}_{max}" data-canonical-src="https://latex.codecogs.com/svg.image?P^{pv}_{max}" style="max-width: 100%;"></a>表示光伏面板的最大发电功率。</p>
+<h3>2.2 用电负载</h3>
+<p>对负载进行优化的相关工作非常多，通常将负载分为固定负载、可转移负载和可削减负载。固定负载指的是必须要及时满足的负载，可以转移负载表示可以转移到其他时刻的用电负载，可削减负载就是可以不使用的用电负载。利用需求响应机制可以进行智能化的调控。本期内容不涉及需求相应机制因此这里不做过多介绍。用电负载的相关约束如下：<br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/94d7a2522b92b02faf1de8f901707a4929c5cdc7e40f46b982aa2bed18a73d51/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f305c6c652673706163653b505e6c5f745c6c652673706163653b505e6c5f7b6d61787d283229"><img src="https://camo.githubusercontent.com/94d7a2522b92b02faf1de8f901707a4929c5cdc7e40f46b982aa2bed18a73d51/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f305c6c652673706163653b505e6c5f745c6c652673706163653b505e6c5f7b6d61787d283229" title="0\le P^l_t\le P^l_{max}(2)" data-canonical-src="https://latex.codecogs.com/svg.image?0\le&amp;space;P^l_t\le&amp;space;P^l_{max}(2)" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/6945892ef9a1bf0700e77955ce0b73143bcb2f4f5de138b0fd8a97d5d8caa696/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e6c5f74"><img src="https://camo.githubusercontent.com/6945892ef9a1bf0700e77955ce0b73143bcb2f4f5de138b0fd8a97d5d8caa696/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e6c5f74" title="P^l_t" data-canonical-src="https://latex.codecogs.com/svg.image?P^l_t" style="max-width: 100%;"></a>表示 t 时刻的负载功率，<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/db4803656eca42598b471e673012eb4b15f533732abcb47a52dc882f1d5b37e3/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e6c5f7b6d61787d"><img src="https://camo.githubusercontent.com/db4803656eca42598b471e673012eb4b15f533732abcb47a52dc882f1d5b37e3/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e6c5f7b6d61787d" title="P^l_{max}" data-canonical-src="https://latex.codecogs.com/svg.image?P^l_{max}" style="max-width: 100%;"></a>表示最大的负载功率。</p>
+<h3>2.3 储能系统</h3>
+<p>储能系统是微电网能源管理中的核心组件。储能系统包括很多种类，比如电化学储能（锂离子电池、铅酸电池）、机械储能（抽水储能、压缩空气储能、飞轮储能）、电磁储能（超级电容器储能、超导磁储能）、热储能（相变储能、热化学储能）和化学储能（氢能储能）等。这里我们用一个最简单的电池储能，模型如下：<br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/6751856997b6423699ea03f34a9260b6282e12b625487eb29004c1700ec0f5ea/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f7b742b317d3d455e625f7b747d2d5c6574617b28505e625f74297d505e625f745c747269616e676c652673706163653b74283329"><img src="https://camo.githubusercontent.com/6751856997b6423699ea03f34a9260b6282e12b625487eb29004c1700ec0f5ea/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f7b742b317d3d455e625f7b747d2d5c6574617b28505e625f74297d505e625f745c747269616e676c652673706163653b74283329" title="E^b_{t+1}=E^b_{t}-\eta{(P^b_t)}P^b_t\triangle t(3)" data-canonical-src="https://latex.codecogs.com/svg.image?E^b_{t+1}=E^b_{t}-\eta{(P^b_t)}P^b_t\triangle&amp;space;t(3)" style="max-width: 100%;"></a><br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/ad0b186623ec1e317870e3ae3e0ff2b8e2d2234e3087ae255851f242a8ad8320/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f534f435e625f743d455e625f742f455e625f7b6d61787d283429"><img src="https://camo.githubusercontent.com/ad0b186623ec1e317870e3ae3e0ff2b8e2d2234e3087ae255851f242a8ad8320/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f534f435e625f743d455e625f742f455e625f7b6d61787d283429" title="SOC^b_t=E^b_t/E^b_{max}(4)" data-canonical-src="https://latex.codecogs.com/svg.image?SOC^b_t=E^b_t/E^b_{max}(4)" style="max-width: 100%;"></a><br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/2482dc0647320ced5763b910fb7085869646b73e3d301ee4aba798aede57e0f7/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f2d505e7b6368617267657d5f7b6d61787d5c6c652673706163653b505e625f745c6c652673706163653b505e7b6469736368617267657d5f7b6d61787d283529"><img src="https://camo.githubusercontent.com/2482dc0647320ced5763b910fb7085869646b73e3d301ee4aba798aede57e0f7/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f2d505e7b6368617267657d5f7b6d61787d5c6c652673706163653b505e625f745c6c652673706163653b505e7b6469736368617267657d5f7b6d61787d283529" title="-P^{charge}_{max}\le P^b_t\le P^{discharge}_{max}(5)" data-canonical-src="https://latex.codecogs.com/svg.image?-P^{charge}_{max}\le&amp;space;P^b_t\le&amp;space;P^{discharge}_{max}(5)" style="max-width: 100%;"></a><br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/ddc579370b8beb2710d3439d59caff662b199ce83691b29b3150298497874643/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f7b6d696e7d5c6c652673706163653b455e625f745c6c652673706163653b455e625f7b6d61787d283629"><img src="https://camo.githubusercontent.com/ddc579370b8beb2710d3439d59caff662b199ce83691b29b3150298497874643/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f7b6d696e7d5c6c652673706163653b455e625f745c6c652673706163653b455e625f7b6d61787d283629" title="E^b_{min}\le E^b_t\le E^b_{max}(6)" data-canonical-src="https://latex.codecogs.com/svg.image?E^b_{min}\le&amp;space;E^b_t\le&amp;space;E^b_{max}(6)" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/be57b1bdb0a8d768dd6ad75001ac4dd7a185f758a0dc5e12c8b42b1396eaff07/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f74"><img src="https://camo.githubusercontent.com/be57b1bdb0a8d768dd6ad75001ac4dd7a185f758a0dc5e12c8b42b1396eaff07/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f74" title="E^b_t" data-canonical-src="https://latex.codecogs.com/svg.image?E^b_t" style="max-width: 100%;"></a>表示 t 时刻电池的剩余容量，<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/a48d97d8616e60047789518355cb10c9c7eb4455ebfa126c7d367c69b847bbdf/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e625f74"><img src="https://camo.githubusercontent.com/a48d97d8616e60047789518355cb10c9c7eb4455ebfa126c7d367c69b847bbdf/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e625f74" title="P^b_t" data-canonical-src="https://latex.codecogs.com/svg.image?P^b_t" style="max-width: 100%;"></a>表示电池的充放电功率，大于 0 表示放电，小于 0 表示充电，<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/4bdc3150612e0dcc97cd2f0d41a2ad3b96b8186a0979a09c0f933da596e48c56/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f5c6574617b285c63646f74297d"><img src="https://camo.githubusercontent.com/4bdc3150612e0dcc97cd2f0d41a2ad3b96b8186a0979a09c0f933da596e48c56/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f5c6574617b285c63646f74297d" title="\eta{(\cdot)}" data-canonical-src="https://latex.codecogs.com/svg.image?\eta{(\cdot)}" style="max-width: 100%;"></a>表示电池的转换效率。<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/300c246a4101658810c3a7c560730aec043ae26bef5c5260b906851d19aab08e/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e7b6368617267657d5f7b6d61787d2c505e7b6469736368617267657d5f7b6d61787d"><img src="https://camo.githubusercontent.com/300c246a4101658810c3a7c560730aec043ae26bef5c5260b906851d19aab08e/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e7b6368617267657d5f7b6d61787d2c505e7b6469736368617267657d5f7b6d61787d" title="P^{charge}_{max},P^{discharge}_{max}" data-canonical-src="https://latex.codecogs.com/svg.image?P^{charge}_{max},P^{discharge}_{max}" style="max-width: 100%;"></a>表示最大充电和放电功率，<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/7e24428c1bd6edc95c587eed0724976d1b48e3b1ccf61aaab09345b82d7a5def/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f7b6d696e7d2c455e625f7b6d61787d"><img src="https://camo.githubusercontent.com/7e24428c1bd6edc95c587eed0724976d1b48e3b1ccf61aaab09345b82d7a5def/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f455e625f7b6d696e7d2c455e625f7b6d61787d" title="E^b_{min},E^b_{max}" data-canonical-src="https://latex.codecogs.com/svg.image?E^b_{min},E^b_{max}" style="max-width: 100%;"></a>表示最小和最大电池容量。</p>
+<h3>2.4 主电网</h3>
+<p>主电网作为外部能源。微电网能源短缺时，可以从主电网中购入能源来满足用电负载，在有能源剩余时卖出能源给主电网来获取收益。电价的相关约束如下：<br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/f8a94f8ce39332087c280959e6a9655e2fab6cac9ee6434d39a0e2d2997e17cf/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f303c435e6d5f745c6c652673706163653b435e6d5f7b6d61787d283729"><img src="https://camo.githubusercontent.com/f8a94f8ce39332087c280959e6a9655e2fab6cac9ee6434d39a0e2d2997e17cf/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f303c435e6d5f745c6c652673706163653b435e6d5f7b6d61787d283729" title="0&lt;C^m_t\le C^m_{max}(7)" data-canonical-src="https://latex.codecogs.com/svg.image?0&lt;C^m_t\le&amp;space;C^m_{max}(7)" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/3505d119543414009bdb0ed9abfa11ca43372c7cd8088c4e751edbfbf0d78b3d/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e6d5f74"><img src="https://camo.githubusercontent.com/3505d119543414009bdb0ed9abfa11ca43372c7cd8088c4e751edbfbf0d78b3d/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e6d5f74" title="C^m_t" data-canonical-src="https://latex.codecogs.com/svg.image?C^m_t" style="max-width: 100%;"></a>表示 t 时刻的实时电价，<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/67ae4a2f8b8ef84914f7dcee92b2d0201301659b6a1952b79de89a7fd4a8c3da/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e6d5f7b6d61787d"><img src="https://camo.githubusercontent.com/67ae4a2f8b8ef84914f7dcee92b2d0201301659b6a1952b79de89a7fd4a8c3da/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e6d5f7b6d61787d" title="C^m_{max}" data-canonical-src="https://latex.codecogs.com/svg.image?C^m_{max}" style="max-width: 100%;"></a>表示最大电价。<br>
+此外，为了实验简单，我们将每一时刻主电网的回收电价为该时刻电价的 0.7 倍。</p>
+<h2>3. 优化目标</h2>
+<p>在每一时刻，能源管理系统通过调控储能系统的充放电功率和与主电网的交易量来实现微电网能源的功率平衡。注意，我们以一小时为单位进行调度，每个组件的功率为 kW/h，因此其功率数值可以直接反映用电和发电量。也是与主电网的交易量求解如下：<br>
+<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/1c0c80ba69c325f1555c8054371f6fc6d479ce68f02affd3e5395feba3b0b083/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e655f743d505e6c5f742d505e7b70767d5f742d5c6574617b28505e625f74297d505e625f74283829"><img src="https://camo.githubusercontent.com/1c0c80ba69c325f1555c8054371f6fc6d479ce68f02affd3e5395feba3b0b083/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e655f743d505e6c5f742d505e7b70767d5f742d5c6574617b28505e625f74297d505e625f74283829" title="P^e_t=P^l_t-P^{pv}_t-\eta{(P^b_t)}P^b_t(8)" data-canonical-src="https://latex.codecogs.com/svg.image?P^e_t=P^l_t-P^{pv}_t-\eta{(P^b_t)}P^b_t(8)" style="max-width: 100%;"></a></p>
+<p>交易量<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/e55d61f08165ad1ac1b30efd2dccbb8ebadf3dfea819863e5d21cd57d991e0f2/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e655f742673706163653b"><img src="https://camo.githubusercontent.com/e55d61f08165ad1ac1b30efd2dccbb8ebadf3dfea819863e5d21cd57d991e0f2/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f505e655f742673706163653b" title="P^e_t " data-canonical-src="https://latex.codecogs.com/svg.image?P^e_t&amp;space;" style="max-width: 100%;"></a>大于 0 时表示需要从主电网中购入能源，当交易量小于 0 时表示需要卖出能源给主电网。</p>
+<p>我们的优化目标包含两个：</p>
+<ol>
+<li><strong>减少用户的用电费用</strong></li>
+</ol>
+<ul>
+<li>用户在每一时刻的用电费用如下：</li>
+</ul>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/c0a3ec5b3bb2272d780101059d59028fc70cb3ff098a3bc94d942d4cdcfd7ea1/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e7b667d5f743d5c6c6566745c7b5c626567696e7b6d61747269787d505e655f745c63646f742673706163653b435e6d5f7426505e655f745c67652673706163653b305c5c505e655f745c63646f742673706163653b435e6d5f742a302e3726505e655f743c305c656e647b6d61747269787d5c72696768742e283929"><img src="https://camo.githubusercontent.com/c0a3ec5b3bb2272d780101059d59028fc70cb3ff098a3bc94d942d4cdcfd7ea1/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e7b667d5f743d5c6c6566745c7b5c626567696e7b6d61747269787d505e655f745c63646f742673706163653b435e6d5f7426505e655f745c67652673706163653b305c5c505e655f745c63646f742673706163653b435e6d5f742a302e3726505e655f743c305c656e647b6d61747269787d5c72696768742e283929" title="C^{f}_t=\left\{\begin{matrix}P^e_t\cdot C^m_t&amp;P^e_t\ge 0\\P^e_t\cdot C^m_t*0.7&amp;P^e_t&lt;0\end{matrix}\right.(9)" data-canonical-src="https://latex.codecogs.com/svg.image?C^{f}_t=\left\{\begin{matrix}P^e_t\cdot&amp;space;C^m_t&amp;P^e_t\ge&amp;space;0\\P^e_t\cdot&amp;space;C^m_t*0.7&amp;P^e_t&lt;0\end{matrix}\right.(9)" style="max-width: 100%;"></a></p>
+<ol start="2">
+<li><strong>储能系统的 SOC 惩罚，我们希望储能系统的 SOC 尽量控制在中间水平来延长储能设备的使用寿命</strong>。</li>
+</ol>
+<ul>
+<li>储能系统的SOC 惩罚如下：</li>
+</ul>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/fc4b50cb3b6de1955b254a11f9b7636ca3c4508be5cb0a689f690ff6409d222e/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e625f743d28534f435e625f7b742b317d2d302e35295e3228313029"><img src="https://camo.githubusercontent.com/fc4b50cb3b6de1955b254a11f9b7636ca3c4508be5cb0a689f690ff6409d222e/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e625f743d28534f435e625f7b742b317d2d302e35295e3228313029" title="C^b_t=(SOC^b_{t+1}-0.5)^2(10)" data-canonical-src="https://latex.codecogs.com/svg.image?C^b_t=(SOC^b_{t+1}-0.5)^2(10)" style="max-width: 100%;"></a></p>
+<ul>
+<li>两个优化目标的属性不一样，为了将其合并需要在用电费用中引入一个标准化因子<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/503437f23f930acc08889326759d94a01c9ba0535a10ca7d55df95905d2a3a57/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f4e5e66"><img src="https://camo.githubusercontent.com/503437f23f930acc08889326759d94a01c9ba0535a10ca7d55df95905d2a3a57/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f4e5e66" title="N^f" data-canonical-src="https://latex.codecogs.com/svg.image?N^f" style="max-width: 100%;"></a>，并且引入两个权重参数<a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/e6ad6d0cd80afab24f9b5e597bfb2e6ffca9577904f1e4bd042a1234c983be90/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f6d5f312c6d5f32"><img src="https://camo.githubusercontent.com/e6ad6d0cd80afab24f9b5e597bfb2e6ffca9577904f1e4bd042a1234c983be90/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f6d5f312c6d5f32" title="m_1,m_2" data-canonical-src="https://latex.codecogs.com/svg.image?m_1,m_2" style="max-width: 100%;"></a>来调整两者的重要程度：</li>
+</ul>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/cb1c0699c4b73ca043369044559ceed8bcace687c465a7194be3ea29013b91e4/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e7b616c6c7d5f743d6d5f312a435e665f742f4e5e662b6d5f322a435e625f7428313129"><img src="https://camo.githubusercontent.com/cb1c0699c4b73ca043369044559ceed8bcace687c465a7194be3ea29013b91e4/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f435e7b616c6c7d5f743d6d5f312a435e665f742f4e5e662b6d5f322a435e625f7428313129" title="C^{all}_t=m_1*C^f_t/N^f+m_2*C^b_t(11)" data-canonical-src="https://latex.codecogs.com/svg.image?C^{all}_t=m_1*C^f_t/N^f+m_2*C^b_t(11)" style="max-width: 100%;"></a></p>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/7ac5e84215bcf37b591d1fc4e9d23c563f4dc537fafed6be08581e6fff882ac6/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f4e5e663d505e6c5f7b6d61787d2a435e6d5f7b6d61787d28313229"><img src="https://camo.githubusercontent.com/7ac5e84215bcf37b591d1fc4e9d23c563f4dc537fafed6be08581e6fff882ac6/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f4e5e663d505e6c5f7b6d61787d2a435e6d5f7b6d61787d28313229" title="N^f=P^l_{max}*C^m_{max}(12)" data-canonical-src="https://latex.codecogs.com/svg.image?N^f=P^l_{max}*C^m_{max}(12)" style="max-width: 100%;"></a></p>
+<ul>
+<li>最终我们的优化目标为：</li>
+</ul>
+<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://camo.githubusercontent.com/d59eff5f709489a8d439206450d57438e5ab3795211ad07a8cebe402dead4493/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f6d61785c73756d5e545f7b743d307d2d435e7b616c6c7d5f7428313329"><img src="https://camo.githubusercontent.com/d59eff5f709489a8d439206450d57438e5ab3795211ad07a8cebe402dead4493/68747470733a2f2f6c617465782e636f6465636f67732e636f6d2f7376672e696d6167653f6d61785c73756d5e545f7b743d307d2d435e7b616c6c7d5f7428313329" title="max\sum^T_{t=0}-C^{all}_t(13)" data-canonical-src="https://latex.codecogs.com/svg.image?max\sum^T_{t=0}-C^{all}_t(13)" style="max-width: 100%;"></a></p></div>
+<div style="font-size:small;margin-top:8px;float:right;"></div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://kxmust.github.io">吃瓜的哲学</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","kxmust/kxmust.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+
+
+</script>
+
+
+</html>
