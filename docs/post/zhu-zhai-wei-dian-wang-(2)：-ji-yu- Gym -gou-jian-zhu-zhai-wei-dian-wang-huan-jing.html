@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/99197662?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="上一篇内容详细介绍了住宅微电网能源管理的优化目标，所有组件和相关约束。">
+<meta property="og:title" content="住宅微电网(2)：基于 Gym 构建住宅微电网环境">
+<meta property="og:description" content="上一篇内容详细介绍了住宅微电网能源管理的优化目标，所有组件和相关约束。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kxmust.github.io/post/zhu-zhai-wei-dian-wang-%282%29%EF%BC%9A-ji-yu-%20Gym%20-gou-jian-zhu-zhai-wei-dian-wang-huan-jing.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
+<title>住宅微电网(2)：基于 Gym 构建住宅微电网环境</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">住宅微电网(2)：基于 Gym 构建住宅微电网环境</h1>
+<div class="title-right">
+    <a href="https://kxmust.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/kxmust/kxmust.github.io/issues/22" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><p>上一篇内容详细介绍了住宅微电网能源管理的优化目标，所有组件和相关约束。这期内容将基于 Gym 环境来构建一个住宅微电网模型用来模拟住宅微电网的运行。后续会基于深度强化学习算法构建微电网能源管理系统来实现住宅微电网的智能化调度。</p>
+<h2>1. 数据处理</h2>
+<p>首先从"home_1_training_30days.csv "文件中读取负载数据和光伏数据，从"electricity_price_training.csv"文件中读取电价数据。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 导入数据</span>
+<span class="pl-s1">load_data</span> <span class="pl-c1">=</span> <span class="pl-s1">pd</span>.<span class="pl-c1">read_csv</span>(<span class="pl-s">r'data/home_1_training_30days.csv'</span>,
+                        <span class="pl-s1">header</span><span class="pl-c1">=</span><span class="pl-c1">0</span>).<span class="pl-c1">iloc</span>[:, <span class="pl-c1">1</span>]
+<span class="pl-s1">pv_data</span> <span class="pl-c1">=</span> <span class="pl-s1">pd</span>.<span class="pl-c1">read_csv</span>(<span class="pl-s">r'data/home_1_training_30days.csv'</span>,
+                      <span class="pl-s1">header</span><span class="pl-c1">=</span><span class="pl-c1">0</span>).<span class="pl-c1">iloc</span>[:, <span class="pl-c1">2</span>]
+<span class="pl-s1">price_data</span> <span class="pl-c1">=</span> <span class="pl-s1">pd</span>.<span class="pl-c1">read_csv</span>(<span class="pl-s">r'data/electricity_price_training.csv'</span>,
+                         <span class="pl-s1">header</span><span class="pl-c1">=</span><span class="pl-c1">0</span>).<span class="pl-c1">iloc</span>[:, <span class="pl-c1">1</span>]</pre></div>
+<p>构建一个数据类方法，可以通过pv(t)，来读取t时刻的光伏数据；通过load(t)，来读取t时刻的负载数据；通过ug_price(t)，来读取t时刻的电价数据；plot_figure(data_type, hours)来显示数据，比如输入（'pv', 24）表示画出24小时的PV数据。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">class</span> <span class="pl-v">RM_Data</span>:
+    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">load_data</span>, <span class="pl-s1">pv_data</span>, <span class="pl-s1">price_data</span>):
+        <span class="pl-s1">self</span>.<span class="pl-c1">pv_data</span> <span class="pl-c1">=</span> <span class="pl-s1">pv_data</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">load_data</span> <span class="pl-c1">=</span> <span class="pl-s1">load_data</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">price_data</span> <span class="pl-c1">=</span> <span class="pl-s1">price_data</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">len_data</span> <span class="pl-c1">=</span> <span class="pl-en">len</span>(<span class="pl-s1">load_data</span>)
+
+    <span class="pl-k">def</span> <span class="pl-en">pv</span>(<span class="pl-s1">self</span>, <span class="pl-s1">t</span>):
+        <span class="pl-k">return</span> <span class="pl-s1">self</span>.<span class="pl-c1">pv_data</span>[<span class="pl-s1">t</span>]
+
+    <span class="pl-k">def</span> <span class="pl-en">ug_price</span>(<span class="pl-s1">self</span>, <span class="pl-s1">t</span>):
+        <span class="pl-k">return</span> <span class="pl-s1">self</span>.<span class="pl-c1">price_data</span>[<span class="pl-s1">t</span>]
+
+    <span class="pl-k">def</span> <span class="pl-en">load</span>(<span class="pl-s1">self</span>, <span class="pl-s1">t</span>):
+        <span class="pl-k">return</span> <span class="pl-s1">self</span>.<span class="pl-c1">load_data</span>[<span class="pl-s1">t</span>]
+
+    <span class="pl-k">def</span> <span class="pl-en">plot_figure</span>(<span class="pl-s1">self</span>, <span class="pl-s1">data_type</span>, <span class="pl-s1">hours</span>, <span class="pl-s1">save_dir</span><span class="pl-c1">=</span><span class="pl-s">'plots'</span>):
+        <span class="pl-s">"""</span>
+<span class="pl-s">        绘制时间序列数据图表</span>
+<span class="pl-s"></span>
+<span class="pl-s">        参数:</span>
+<span class="pl-s">        data_type: 数据类型，可选 'pv'、'load'、'price'</span>
+<span class="pl-s">        hours: 时间长度（小时）</span>
+<span class="pl-s">        save_dir: 图片保存目录</span>
+<span class="pl-s">        """</span>
+
+        <span class="pl-c"># 创建保存目录</span>
+        <span class="pl-s1">os</span>.<span class="pl-c1">makedirs</span>(<span class="pl-s1">save_dir</span>, <span class="pl-s1">exist_ok</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
+
+        <span class="pl-c"># 生成时间序列（假设从0点开始）</span>
+        <span class="pl-s1">time_points</span> <span class="pl-c1">=</span> <span class="pl-en">list</span>(<span class="pl-en">range</span>(<span class="pl-s1">hours</span>))
+
+        <span class="pl-c"># 根据数据类型读取数据</span>
+        <span class="pl-s1">data</span> <span class="pl-c1">=</span> []
+        <span class="pl-k">for</span> <span class="pl-s1">t</span> <span class="pl-c1">in</span> <span class="pl-s1">time_points</span>:
+            <span class="pl-k">if</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">==</span> <span class="pl-s">'pv'</span>:
+                <span class="pl-s1">data</span>.<span class="pl-c1">append</span>(<span class="pl-s1">self</span>.<span class="pl-c1">pv</span>(<span class="pl-s1">t</span>))  <span class="pl-c"># 调用pv函数</span>
+            <span class="pl-k">elif</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">==</span> <span class="pl-s">'load'</span>:
+                <span class="pl-s1">data</span>.<span class="pl-c1">append</span>(<span class="pl-s1">self</span>.<span class="pl-c1">load</span>(<span class="pl-s1">t</span>))  <span class="pl-c"># 调用load函数</span>
+            <span class="pl-k">elif</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">==</span> <span class="pl-s">'price'</span>:
+                <span class="pl-s1">data</span>.<span class="pl-c1">append</span>(<span class="pl-s1">self</span>.<span class="pl-c1">ug_price</span>(<span class="pl-s1">t</span>))  <span class="pl-c"># 调用price函数</span>
+            <span class="pl-k">else</span>:
+                <span class="pl-k">raise</span> <span class="pl-en">ValueError</span>(<span class="pl-s">f"不支持的数据类型: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">data_type</span><span class="pl-kos">}</span></span>，请使用 'pv', 'load' 或 'price'"</span>)
+
+        <span class="pl-s1">data</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">array</span>(<span class="pl-s1">data</span>)
+
+        <span class="pl-c"># 创建时间标签（从当前时间开始）</span>
+        <span class="pl-s1">base_time</span> <span class="pl-c1">=</span> <span class="pl-s1">datetime</span>.<span class="pl-c1">now</span>().<span class="pl-c1">replace</span>(<span class="pl-s1">hour</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">minute</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">second</span><span class="pl-c1">=</span><span class="pl-c1">0</span>, <span class="pl-s1">microsecond</span><span class="pl-c1">=</span><span class="pl-c1">0</span>)
+        <span class="pl-s1">time_stamps</span> <span class="pl-c1">=</span> [<span class="pl-s1">base_time</span> <span class="pl-c1">+</span> <span class="pl-en">timedelta</span>(<span class="pl-s1">hours</span><span class="pl-c1">=</span><span class="pl-s1">t</span>) <span class="pl-k">for</span> <span class="pl-s1">t</span> <span class="pl-c1">in</span> <span class="pl-s1">time_points</span>]
+
+        <span class="pl-c"># 设置图表样式</span>
+        <span class="pl-s1">plt</span>.<span class="pl-c1">style</span>.<span class="pl-c1">use</span>(<span class="pl-s">'seaborn-v0_8-darkgrid'</span>)
+        <span class="pl-s1">fig</span>, <span class="pl-s1">ax</span> <span class="pl-c1">=</span> <span class="pl-s1">plt</span>.<span class="pl-c1">subplots</span>(<span class="pl-s1">figsize</span><span class="pl-c1">=</span>(<span class="pl-c1">12</span>, <span class="pl-c1">6</span>))
+
+        <span class="pl-c"># 根据数据类型设置图表属性</span>
+        <span class="pl-k">if</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">==</span> <span class="pl-s">'pv'</span>:
+            <span class="pl-s1">title</span> <span class="pl-c1">=</span> <span class="pl-s">f'PV Power (0-<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">hours</span><span class="pl-kos">}</span></span>Hours)'</span>
+            <span class="pl-s1">ylabel</span> <span class="pl-c1">=</span> <span class="pl-s">'Power (kW)'</span>
+            <span class="pl-s1">color</span> <span class="pl-c1">=</span> <span class="pl-s">'#FFA500'</span>  <span class="pl-c"># 橙色</span>
+            <span class="pl-s1">line_style</span> <span class="pl-c1">=</span> <span class="pl-s">'-o'</span>
+            <span class="pl-s1">alpha</span> <span class="pl-c1">=</span> <span class="pl-c1">0.7</span>
+        <span class="pl-k">elif</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">==</span> <span class="pl-s">'load'</span>:
+            <span class="pl-s1">title</span> <span class="pl-c1">=</span> <span class="pl-s">f'Load Power (0-<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">hours</span><span class="pl-kos">}</span></span>Hours)'</span>
+            <span class="pl-s1">ylabel</span> <span class="pl-c1">=</span> <span class="pl-s">'Power (kW)'</span>
+            <span class="pl-s1">color</span> <span class="pl-c1">=</span> <span class="pl-s">'#1E90FF'</span>  <span class="pl-c"># 道奇蓝</span>
+            <span class="pl-s1">line_style</span> <span class="pl-c1">=</span> <span class="pl-s">'-s'</span>
+            <span class="pl-s1">alpha</span> <span class="pl-c1">=</span> <span class="pl-c1">0.7</span>
+        <span class="pl-k">elif</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">==</span> <span class="pl-s">'price'</span>:
+            <span class="pl-s1">title</span> <span class="pl-c1">=</span> <span class="pl-s">f'Electricity Price (0-<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">hours</span><span class="pl-kos">}</span></span>Hours)'</span>
+            <span class="pl-s1">ylabel</span> <span class="pl-c1">=</span> <span class="pl-s">'Price (yuan/kWh)'</span>
+            <span class="pl-s1">color</span> <span class="pl-c1">=</span> <span class="pl-s">'#32CD32'</span>  <span class="pl-c"># 石灰绿</span>
+            <span class="pl-s1">line_style</span> <span class="pl-c1">=</span> <span class="pl-s">'-^'</span>
+            <span class="pl-s1">alpha</span> <span class="pl-c1">=</span> <span class="pl-c1">0.7</span>
+
+        <span class="pl-c"># 绘制线图</span>
+        <span class="pl-s1">ax</span>.<span class="pl-c1">plot</span>(<span class="pl-s1">time_stamps</span>, <span class="pl-s1">data</span>, <span class="pl-s1">line_style</span>, <span class="pl-s1">color</span><span class="pl-c1">=</span><span class="pl-s1">color</span>,
+                <span class="pl-s1">linewidth</span><span class="pl-c1">=</span><span class="pl-c1">2</span>, <span class="pl-s1">markersize</span><span class="pl-c1">=</span><span class="pl-c1">6</span>, <span class="pl-s1">alpha</span><span class="pl-c1">=</span><span class="pl-s1">alpha</span>,
+                <span class="pl-s1">label</span><span class="pl-c1">=</span><span class="pl-s1">data_type</span>.<span class="pl-c1">upper</span>())
+
+        <span class="pl-c"># 填充区域（针对pv和load）</span>
+        <span class="pl-k">if</span> <span class="pl-s1">data_type</span>.<span class="pl-c1">lower</span>() <span class="pl-c1">in</span> [<span class="pl-s">'pv'</span>, <span class="pl-s">'load'</span>]:
+            <span class="pl-s1">ax</span>.<span class="pl-c1">fill_between</span>(<span class="pl-s1">time_stamps</span>, <span class="pl-c1">0</span>, <span class="pl-s1">data</span>, <span class="pl-s1">alpha</span><span class="pl-c1">=</span><span class="pl-c1">0.2</span>, <span class="pl-s1">color</span><span class="pl-c1">=</span><span class="pl-s1">color</span>)
+
+        <span class="pl-c"># 设置图表属性</span>
+        <span class="pl-s1">ax</span>.<span class="pl-c1">set_xlabel</span>(<span class="pl-s">'Time'</span>, <span class="pl-s1">fontsize</span><span class="pl-c1">=</span><span class="pl-c1">12</span>, <span class="pl-s1">fontweight</span><span class="pl-c1">=</span><span class="pl-s">'bold'</span>)
+        <span class="pl-s1">ax</span>.<span class="pl-c1">set_ylabel</span>(<span class="pl-s1">ylabel</span>, <span class="pl-s1">fontsize</span><span class="pl-c1">=</span><span class="pl-c1">12</span>, <span class="pl-s1">fontweight</span><span class="pl-c1">=</span><span class="pl-s">'bold'</span>)
+        <span class="pl-s1">ax</span>.<span class="pl-c1">set_title</span>(<span class="pl-s1">title</span>, <span class="pl-s1">fontsize</span><span class="pl-c1">=</span><span class="pl-c1">14</span>, <span class="pl-s1">fontweight</span><span class="pl-c1">=</span><span class="pl-s">'bold'</span>, <span class="pl-s1">pad</span><span class="pl-c1">=</span><span class="pl-c1">20</span>)
+
+        <span class="pl-c"># 设置x轴时间格式</span>
+        <span class="pl-k">if</span> <span class="pl-s1">hours</span> <span class="pl-c1">&lt;=</span> <span class="pl-c1">24</span>:
+            <span class="pl-c"># 每小时显示一个标签</span>
+            <span class="pl-s1">ax</span>.<span class="pl-c1">xaxis</span>.<span class="pl-c1">set_major_locator</span>(<span class="pl-s1">mdates</span>.<span class="pl-c1">HourLocator</span>(<span class="pl-s1">interval</span><span class="pl-c1">=</span><span class="pl-en">max</span>(<span class="pl-c1">1</span>, <span class="pl-s1">hours</span> <span class="pl-c1">//</span> <span class="pl-c1">12</span>)))
+            <span class="pl-s1">ax</span>.<span class="pl-c1">xaxis</span>.<span class="pl-c1">set_major_formatter</span>(<span class="pl-s1">mdates</span>.<span class="pl-c1">DateFormatter</span>(<span class="pl-s">'%H:%M'</span>))
+        <span class="pl-k">else</span>:
+            <span class="pl-c"># 超过24小时，按天显示</span>
+            <span class="pl-s1">ax</span>.<span class="pl-c1">xaxis</span>.<span class="pl-c1">set_major_locator</span>(<span class="pl-s1">mdates</span>.<span class="pl-c1">DayLocator</span>())
+            <span class="pl-s1">ax</span>.<span class="pl-c1">xaxis</span>.<span class="pl-c1">set_major_formatter</span>(<span class="pl-s1">mdates</span>.<span class="pl-c1">DateFormatter</span>(<span class="pl-s">'%m/%d'</span>))
+            <span class="pl-s1">ax</span>.<span class="pl-c1">xaxis</span>.<span class="pl-c1">set_minor_locator</span>(<span class="pl-s1">mdates</span>.<span class="pl-c1">HourLocator</span>(<span class="pl-s1">byhour</span><span class="pl-c1">=</span>[<span class="pl-c1">0</span>, <span class="pl-c1">6</span>, <span class="pl-c1">12</span>, <span class="pl-c1">18</span>]))
+
+        <span class="pl-c"># 旋转x轴标签</span>
+        <span class="pl-s1">plt</span>.<span class="pl-c1">xticks</span>(<span class="pl-s1">rotation</span><span class="pl-c1">=</span><span class="pl-c1">45</span>)
+
+        <span class="pl-c"># 添加网格</span>
+        <span class="pl-s1">ax</span>.<span class="pl-c1">grid</span>(<span class="pl-c1">True</span>, <span class="pl-s1">which</span><span class="pl-c1">=</span><span class="pl-s">'major'</span>, <span class="pl-s1">linestyle</span><span class="pl-c1">=</span><span class="pl-s">'-'</span>, <span class="pl-s1">linewidth</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>, <span class="pl-s1">alpha</span><span class="pl-c1">=</span><span class="pl-c1">0.7</span>)
+        <span class="pl-s1">ax</span>.<span class="pl-c1">grid</span>(<span class="pl-c1">True</span>, <span class="pl-s1">which</span><span class="pl-c1">=</span><span class="pl-s">'minor'</span>, <span class="pl-s1">linestyle</span><span class="pl-c1">=</span><span class="pl-s">'--'</span>, <span class="pl-s1">linewidth</span><span class="pl-c1">=</span><span class="pl-c1">0.3</span>, <span class="pl-s1">alpha</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>)
+
+        <span class="pl-c"># 添加图例</span>
+        <span class="pl-s1">ax</span>.<span class="pl-c1">legend</span>(<span class="pl-s1">loc</span><span class="pl-c1">=</span><span class="pl-s">'best'</span>, <span class="pl-s1">fontsize</span><span class="pl-c1">=</span><span class="pl-c1">10</span>)
+
+        <span class="pl-c"># 添加统计信息文本框</span>
+        <span class="pl-s1">stats_text</span> <span class="pl-c1">=</span> <span class="pl-s">f"""</span>
+<span class="pl-s">        Max Value: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">data</span>.<span class="pl-c1">max</span>():.2f<span class="pl-kos">}</span></span></span>
+<span class="pl-s">        Min Value: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">data</span>.<span class="pl-c1">min</span>():.2f<span class="pl-kos">}</span></span></span>
+<span class="pl-s">        Avg Value: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">data</span>.<span class="pl-c1">mean</span>():.2f<span class="pl-kos">}</span></span></span>
+<span class="pl-s">        Total Times: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">hours</span><span class="pl-kos">}</span></span>Hours</span>
+<span class="pl-s">        """</span>
+
+        <span class="pl-s1">ax</span>.<span class="pl-c1">text</span>(<span class="pl-c1">0.02</span>, <span class="pl-c1">0.98</span>, <span class="pl-s1">stats_text</span>, <span class="pl-s1">transform</span><span class="pl-c1">=</span><span class="pl-s1">ax</span>.<span class="pl-c1">transAxes</span>,
+                <span class="pl-s1">fontsize</span><span class="pl-c1">=</span><span class="pl-c1">9</span>, <span class="pl-s1">verticalalignment</span><span class="pl-c1">=</span><span class="pl-s">'top'</span>,
+                <span class="pl-s1">bbox</span><span class="pl-c1">=</span><span class="pl-en">dict</span>(<span class="pl-s1">boxstyle</span><span class="pl-c1">=</span><span class="pl-s">'round'</span>, <span class="pl-s1">facecolor</span><span class="pl-c1">=</span><span class="pl-s">'wheat'</span>, <span class="pl-s1">alpha</span><span class="pl-c1">=</span><span class="pl-c1">0.8</span>))
+
+        <span class="pl-c"># 自动调整布局</span>
+        <span class="pl-s1">plt</span>.<span class="pl-c1">tight_layout</span>()
+
+        <span class="pl-c"># 生成文件名</span>
+        <span class="pl-s1">timestamp</span> <span class="pl-c1">=</span> <span class="pl-s1">datetime</span>.<span class="pl-c1">now</span>().<span class="pl-c1">strftime</span>(<span class="pl-s">"%Y%m%d_%H%M%S"</span>)
+        <span class="pl-s1">filename</span> <span class="pl-c1">=</span> <span class="pl-s">f"<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">data_type</span><span class="pl-kos">}</span></span>_<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">hours</span><span class="pl-kos">}</span></span>h_<span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">timestamp</span><span class="pl-kos">}</span></span>.png"</span>
+        <span class="pl-s1">filepath</span> <span class="pl-c1">=</span> <span class="pl-s1">os</span>.<span class="pl-c1">path</span>.<span class="pl-c1">join</span>(<span class="pl-s1">save_dir</span>, <span class="pl-s1">filename</span>)
+
+        <span class="pl-c"># 保存图片</span>
+        <span class="pl-s1">plt</span>.<span class="pl-c1">savefig</span>(<span class="pl-s1">filepath</span>, <span class="pl-s1">dpi</span><span class="pl-c1">=</span><span class="pl-c1">300</span>, <span class="pl-s1">bbox_inches</span><span class="pl-c1">=</span><span class="pl-s">'tight'</span>)
+        <span class="pl-en">print</span>(<span class="pl-s">f"The figure is saved: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">filepath</span><span class="pl-kos">}</span></span>"</span>)
+
+        <span class="pl-c"># 显示图表</span>
+        <span class="pl-s1">plt</span>.<span class="pl-c1">show</span>()
+
+        <span class="pl-k">return</span> <span class="pl-s1">filepath</span></pre></div>
+<p>打印出负载、光伏和电价数据。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">rm_data</span> <span class="pl-c1">=</span> <span class="pl-en">RM_Data</span>(<span class="pl-s1">load_data</span>, <span class="pl-s1">pv_data</span>, <span class="pl-s1">price_data</span>)
+<span class="pl-s1">rm_data</span>.<span class="pl-c1">plot_figure</span>(<span class="pl-s">'price'</span>, <span class="pl-s1">hours</span><span class="pl-c1">=</span><span class="pl-c1">24</span>)
+<span class="pl-s1">rm_data</span>.<span class="pl-c1">plot_figure</span>(<span class="pl-s">'load'</span>, <span class="pl-s1">hours</span><span class="pl-c1">=</span><span class="pl-c1">24</span>)
+<span class="pl-s1">rm_data</span>.<span class="pl-c1">plot_figure</span>(<span class="pl-s">'pv'</span>, <span class="pl-s1">hours</span><span class="pl-c1">=</span><span class="pl-c1">24</span>)</pre></div>
+<div>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/102ea669-3de2-4723-849d-63e36599af29"><img src="https://github.com/user-attachments/assets/102ea669-3de2-4723-849d-63e36599af29" alt="描述文本" width="700" height="500" style="max-width: 100%; height: auto; max-height: 500px;"></a>
+  <p>图 1：电费数据</p>
+</div>
+<div>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/e4e22d9c-097d-4e7f-b20e-02d135aedbf0"><img src="https://github.com/user-attachments/assets/e4e22d9c-097d-4e7f-b20e-02d135aedbf0" alt="描述文本" width="700" height="500" style="max-width: 100%; height: auto; max-height: 500px;"></a>
+  <p>图 2：负载数据</p>
+</div>
+<div>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/365ea8fd-2e0d-40cf-ba17-7b13d6d12872"><img src="https://github.com/user-attachments/assets/365ea8fd-2e0d-40cf-ba17-7b13d6d12872" alt="描述文本" width="700" height="500" style="max-width: 100%; height: auto; max-height: 500px;"></a>
+  <p>图 3：光伏数据</p>
+</div>
+<h2>2. 基于Gym构建住宅微电网模型</h2>
+<p>基于上一篇描述的组件和相关约束，以及优化目标，基于Gym构建微电网模型。</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">numpy</span> <span class="pl-k">as</span> <span class="pl-s1">np</span>
+<span class="pl-k">import</span> <span class="pl-s1">gymnasium</span> <span class="pl-k">as</span> <span class="pl-s1">gym</span>
+<span class="pl-k">from</span> <span class="pl-s1">gymnasium</span> <span class="pl-k">import</span> <span class="pl-s1">spaces</span>
+
+<span class="pl-k">class</span> <span class="pl-v">MicrogridEnv</span>(<span class="pl-s1">gym</span>.<span class="pl-c1">Env</span>):
+
+    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">rm_data</span>, <span class="pl-s1">episode_length</span><span class="pl-c1">=</span><span class="pl-c1">24</span>, <span class="pl-s1">is_train</span><span class="pl-c1">=</span><span class="pl-c1">False</span>):
+        <span class="pl-en">super</span>(<span class="pl-v">MicrogridEnv</span>, <span class="pl-s1">self</span>).<span class="pl-c1">__init__</span>()
+
+        <span class="pl-c"># 环境参数</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">episode_length</span> <span class="pl-c1">=</span> <span class="pl-s1">episode_length</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">data_length</span> <span class="pl-c1">=</span> <span class="pl-s1">rm_data</span>.<span class="pl-c1">len_data</span>
+
+        <span class="pl-c"># 微电网参数</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">max_pv</span> <span class="pl-c1">=</span> <span class="pl-c1">4.0</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">max_load</span> <span class="pl-c1">=</span> <span class="pl-c1">5.0</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">max_ug_price</span> <span class="pl-c1">=</span> <span class="pl-c1">5.2</span>
+
+        <span class="pl-c"># 将电池的充放电功率设置为相同</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">battery_charge_power</span> <span class="pl-c1">=</span> <span class="pl-c1">-</span> <span class="pl-c1">5.0</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">battery_discharge_power</span> <span class="pl-c1">=</span> <span class="pl-c1">5.0</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">battery_capacity</span> <span class="pl-c1">=</span> <span class="pl-c1">50.0</span>    <span class="pl-c">#(kWh)</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">battery_eff</span> <span class="pl-c1">=</span> <span class="pl-c1">1.0</span>    <span class="pl-c"># 电池转换效率</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">initial_soc</span> <span class="pl-c1">=</span> <span class="pl-c1">0.5</span>
+
+        <span class="pl-c"># 奖励系数(优化目标)</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">m1</span> <span class="pl-c1">=</span> <span class="pl-c1">0.60</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">m2</span> <span class="pl-c1">=</span> <span class="pl-c1">0.40</span>
+
+        <span class="pl-c"># 数据</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span> <span class="pl-c1">=</span> <span class="pl-s1">rm_data</span>
+
+        <span class="pl-c"># 定义状态空间: [负载, 光伏, 电价, SOC]</span>
+        <span class="pl-c"># 状态空间取值的上限</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">obs_high</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">array</span>([<span class="pl-s1">self</span>.<span class="pl-c1">max_load</span>, <span class="pl-s1">self</span>.<span class="pl-c1">max_pv</span>,
+                             <span class="pl-s1">self</span>.<span class="pl-c1">max_ug_price</span>, <span class="pl-c1">1.0</span>], <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>)
+        <span class="pl-c"># 状态空间取值下限</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">obs_low</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">array</span>([<span class="pl-c1">0.0</span>, <span class="pl-c1">0.0</span>, <span class="pl-c1">0.0</span>, <span class="pl-c1">0.0</span>], <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>)
+
+        <span class="pl-c"># 定义强化学习的观察空间，系统会自动进行归一化处理</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">observation_space</span> <span class="pl-c1">=</span> <span class="pl-s1">spaces</span>.<span class="pl-c1">Box</span>(<span class="pl-s1">low</span><span class="pl-c1">=</span><span class="pl-s1">self</span>.<span class="pl-c1">obs_low</span>, <span class="pl-s1">high</span><span class="pl-c1">=</span><span class="pl-s1">self</span>.<span class="pl-c1">obs_high</span>, <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>)
+
+        <span class="pl-c"># 定义动作空间: 电池充放电功率</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">action_space</span> <span class="pl-c1">=</span> <span class="pl-s1">spaces</span>.<span class="pl-c1">Box</span>(<span class="pl-s1">low</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">array</span>([<span class="pl-s1">self</span>.<span class="pl-c1">battery_charge_power</span>], <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>),
+                                       <span class="pl-s1">high</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">array</span>([<span class="pl-s1">self</span>.<span class="pl-c1">battery_discharge_power</span>], <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>),
+                                       <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>)
+
+        <span class="pl-c"># 初始化状态</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">len_t</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>      <span class="pl-c"># 已经模拟的时长</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-c1">None</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">done</span> <span class="pl-c1">=</span> <span class="pl-c1">False</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>   <span class="pl-c"># 开始训练时，随机抽取一个时刻作为初始时刻</span>
+
+        <span class="pl-c"># 动作</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">action_bound</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">action_space</span>.<span class="pl-c1">high</span>.<span class="pl-c1">item</span>()
+        <span class="pl-s1">self</span>.<span class="pl-c1">is_train</span> <span class="pl-c1">=</span> <span class="pl-s1">is_train</span>
+
+        <span class="pl-c"># 共有 720个数据，后两天用于测试</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">test_start</span> <span class="pl-c1">=</span> <span class="pl-c1">672</span>
+
+    <span class="pl-c"># 初始化环境</span>
+    <span class="pl-k">def</span> <span class="pl-en">reset</span>(<span class="pl-s1">self</span>, <span class="pl-c1">*</span>, <span class="pl-s1">seed</span><span class="pl-c1">=</span><span class="pl-c1">None</span>, <span class="pl-s1">options</span><span class="pl-c1">=</span><span class="pl-c1">None</span>):
+        <span class="pl-en">super</span>().<span class="pl-c1">reset</span>(<span class="pl-s1">seed</span><span class="pl-c1">=</span><span class="pl-s1">seed</span>)
+
+        <span class="pl-c"># 随机选择起始点（增强数据多样性）</span>
+        <span class="pl-k">if</span> <span class="pl-s1">self</span>.<span class="pl-c1">is_train</span>:
+            <span class="pl-s1">max_start</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">test_start</span> <span class="pl-c1">-</span> <span class="pl-s1">self</span>.<span class="pl-c1">episode_length</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>
+            <span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">np_random</span>.<span class="pl-c1">integers</span>(<span class="pl-c1">0</span>, <span class="pl-s1">max_start</span>) \
+                <span class="pl-k">if</span> <span class="pl-s1">max_start</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span> <span class="pl-k">else</span> <span class="pl-c1">0</span>
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">test_start</span>    <span class="pl-c"># 测试时使用后两天的数据</span>
+
+        <span class="pl-s1">self</span>.<span class="pl-c1">len_t</span> <span class="pl-c1">=</span> <span class="pl-c1">0</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">done</span> <span class="pl-c1">=</span> <span class="pl-c1">False</span>
+
+        <span class="pl-s1">load</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span>.<span class="pl-c1">load</span>(<span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span>)
+        <span class="pl-s1">pv</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span>.<span class="pl-c1">pv</span>(<span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span>)
+        <span class="pl-s1">ug_price</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span>.<span class="pl-c1">ug_price</span>(<span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span>)
+        <span class="pl-k">if</span> <span class="pl-s1">self</span>.<span class="pl-c1">is_train</span>:
+            <span class="pl-s1">soc</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">random</span>.<span class="pl-c1">uniform</span>(<span class="pl-c1">0.3</span>, <span class="pl-c1">0.7</span>)
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">soc</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">initial_soc</span>
+
+        <span class="pl-s1">self</span>.<span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">array</span>([<span class="pl-s1">load</span>, <span class="pl-s1">pv</span>, <span class="pl-s1">ug_price</span>, <span class="pl-s1">soc</span>], <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>)
+        <span class="pl-k">return</span> <span class="pl-s1">self</span>.<span class="pl-c1">state</span>, {}
+
+    <span class="pl-c"># 对输入数据归一化</span>
+    <span class="pl-k">def</span> <span class="pl-en">_normalize</span>(<span class="pl-s1">self</span>, <span class="pl-s1">state</span>):
+        <span class="pl-k">return</span> (<span class="pl-s1">state</span> <span class="pl-c1">-</span> <span class="pl-s1">self</span>.<span class="pl-c1">obs_low</span>) <span class="pl-c1">/</span> (<span class="pl-s1">self</span>.<span class="pl-c1">obs_high</span> <span class="pl-c1">-</span> <span class="pl-s1">self</span>.<span class="pl-c1">obs_low</span> <span class="pl-c1">+</span> <span class="pl-c1">1e-8</span>)
+
+    <span class="pl-k">def</span> <span class="pl-en">_clip_battery_action</span>(<span class="pl-s1">self</span>, <span class="pl-s1">battery_power</span>, <span class="pl-s1">current_soc</span>):
+        <span class="pl-s">"""根据当前 SOC 裁剪电池动作，确保物理可行性"""</span>
+        <span class="pl-c"># 计算 SOC 约束下的功率限制</span>
+        <span class="pl-s1">max_charge</span> <span class="pl-c1">=</span> (<span class="pl-s1">current_soc</span> <span class="pl-c1">-</span> <span class="pl-c1">1.0</span>) <span class="pl-c1">*</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_capacity</span> <span class="pl-c1">/</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_eff</span>
+        <span class="pl-s1">max_discharge</span> <span class="pl-c1">=</span> <span class="pl-s1">current_soc</span> <span class="pl-c1">*</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_capacity</span> <span class="pl-c1">/</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_eff</span>
+
+        <span class="pl-s1">clipped_power</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">clip</span>(
+            <span class="pl-s1">battery_power</span>,
+            <span class="pl-en">max</span>(<span class="pl-s1">self</span>.<span class="pl-c1">battery_charge_power</span>, <span class="pl-s1">max_charge</span>),  <span class="pl-c"># 充电（负功率）</span>
+            <span class="pl-en">min</span>(<span class="pl-s1">self</span>.<span class="pl-c1">battery_discharge_power</span>, <span class="pl-s1">max_discharge</span>)  <span class="pl-c"># 放电（正功率）</span>
+        )
+        <span class="pl-k">return</span> <span class="pl-s1">clipped_power</span>
+
+    <span class="pl-c"># 环境步进，基于动作，给出下一时刻的状态</span>
+    <span class="pl-k">def</span> <span class="pl-en">step</span>(<span class="pl-s1">self</span>, <span class="pl-s1">action</span>):
+        <span class="pl-c"># 当前状态</span>
+        <span class="pl-s1">load</span>, <span class="pl-s1">pv</span>, <span class="pl-s1">ug_price</span>, <span class="pl-s1">soc</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">state</span>
+
+        <span class="pl-c"># 当前动作</span>
+        <span class="pl-s1">battery_power</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">_clip_battery_action</span>(<span class="pl-s1">action</span>, <span class="pl-s1">soc</span>)
+
+        <span class="pl-c"># 奖励</span>
+        <span class="pl-s1">reward</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">reward_function</span>(<span class="pl-s1">self</span>.<span class="pl-c1">state</span>, <span class="pl-s1">action</span>)
+
+        <span class="pl-c"># 计算下一时刻状态</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">len_t</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+        <span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span> <span class="pl-c1">+=</span> <span class="pl-c1">1</span>
+
+        <span class="pl-k">if</span> <span class="pl-s1">self</span>.<span class="pl-c1">is_train</span>:
+            <span class="pl-s1">self</span>.<span class="pl-c1">done</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">len_t</span> <span class="pl-c1">&gt;=</span> <span class="pl-s1">self</span>.<span class="pl-c1">episode_length</span>
+
+        <span class="pl-k">if</span> <span class="pl-c1">not</span> <span class="pl-s1">self</span>.<span class="pl-c1">done</span>:
+            <span class="pl-s1">next_load</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span>.<span class="pl-c1">load</span>(<span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span>)
+            <span class="pl-s1">next_pv</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span>.<span class="pl-c1">pv</span>(<span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span>)
+            <span class="pl-s1">next_ug_price</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">rm_data</span>.<span class="pl-c1">ug_price</span>(<span class="pl-s1">self</span>.<span class="pl-c1">episode_start_idx</span>)
+            <span class="pl-s1">next_soc</span> <span class="pl-c1">=</span> <span class="pl-s1">soc</span> <span class="pl-c1">-</span> <span class="pl-s1">battery_power</span> <span class="pl-c1">*</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_eff</span> <span class="pl-c1">/</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_capacity</span>
+
+            <span class="pl-c"># SOC 安全检查（理论上不应该发生）</span>
+            <span class="pl-k">if</span> <span class="pl-s1">next_soc</span> <span class="pl-c1">&lt;</span> <span class="pl-c1">0.</span> <span class="pl-c1">-</span> <span class="pl-c1">1e-7</span> <span class="pl-c1">or</span> <span class="pl-s1">next_soc</span> <span class="pl-c1">&gt;</span> <span class="pl-c1">1.</span> <span class="pl-c1">+</span> <span class="pl-c1">1e-7</span>:
+                <span class="pl-s1">reward</span> <span class="pl-c1">-=</span> <span class="pl-c1">5.0</span>  <span class="pl-c"># 大惩罚</span>
+                <span class="pl-s1">next_soc</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">clip</span>(<span class="pl-s1">next_soc</span>, <span class="pl-c1">0.</span>, <span class="pl-c1">1.</span>)
+                <span class="pl-s1">self</span>.<span class="pl-c1">done</span> <span class="pl-c1">=</span> <span class="pl-c1">True</span>
+
+            <span class="pl-s1">next_state</span> <span class="pl-c1">=</span> <span class="pl-s1">np</span>.<span class="pl-c1">array</span>([<span class="pl-s1">next_load</span>, <span class="pl-s1">next_pv</span>, <span class="pl-s1">next_ug_price</span>, <span class="pl-s1">next_soc</span>], <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">np</span>.<span class="pl-c1">float32</span>)
+
+            <span class="pl-s1">self</span>.<span class="pl-c1">state</span> <span class="pl-c1">=</span> <span class="pl-s1">next_state</span>
+
+        <span class="pl-k">return</span> <span class="pl-s1">self</span>.<span class="pl-c1">state</span>, <span class="pl-s1">reward</span>, <span class="pl-s1">self</span>.<span class="pl-c1">done</span>, <span class="pl-c1">False</span>, {}
+
+    <span class="pl-c"># 奖励函数</span>
+    <span class="pl-k">def</span> <span class="pl-en">reward_function</span>(<span class="pl-s1">self</span>, <span class="pl-s1">state</span>, <span class="pl-s1">action</span>):
+        <span class="pl-s1">load</span>, <span class="pl-s1">pv</span>, <span class="pl-s1">ug_price</span>, <span class="pl-s1">soc</span> <span class="pl-c1">=</span> <span class="pl-s1">state</span>
+        <span class="pl-s1">battery_power</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">_clip_battery_action</span>(<span class="pl-s1">action</span>, <span class="pl-s1">soc</span>)
+
+
+        <span class="pl-c"># 电网交互功率（正：买电；负：卖电）</span>
+        <span class="pl-v">Pe</span> <span class="pl-c1">=</span> <span class="pl-s1">load</span> <span class="pl-c1">-</span> <span class="pl-s1">pv</span> <span class="pl-c1">-</span> <span class="pl-s1">battery_power</span> <span class="pl-c1">*</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_eff</span>
+        <span class="pl-k">if</span> <span class="pl-v">Pe</span> <span class="pl-c1">&gt;=</span> <span class="pl-c1">0</span>:
+            <span class="pl-s1">cost</span> <span class="pl-c1">=</span> <span class="pl-v">Pe</span> <span class="pl-c1">*</span> <span class="pl-s1">ug_price</span>
+        <span class="pl-k">else</span>:
+            <span class="pl-s1">cost</span> <span class="pl-c1">=</span> <span class="pl-v">Pe</span> <span class="pl-c1">*</span> <span class="pl-s1">ug_price</span> <span class="pl-c1">*</span> <span class="pl-c1">0.7</span>  <span class="pl-c"># 卖电收益较低</span>
+
+        <span class="pl-s1">profit_norm</span> <span class="pl-c1">=</span>  <span class="pl-c1">-</span><span class="pl-s1">cost</span><span class="pl-c1">/</span> (<span class="pl-s1">self</span>.<span class="pl-c1">max_load</span> <span class="pl-c1">*</span> <span class="pl-s1">self</span>.<span class="pl-c1">max_ug_price</span>)
+
+        <span class="pl-c"># SOC平衡惩罚</span>
+        <span class="pl-s1">next_soc</span> <span class="pl-c1">=</span> <span class="pl-s1">soc</span> <span class="pl-c1">-</span> <span class="pl-s1">battery_power</span> <span class="pl-c1">*</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_eff</span> <span class="pl-c1">/</span> <span class="pl-s1">self</span>.<span class="pl-c1">battery_capacity</span>
+        <span class="pl-s1">soc_penalty</span> <span class="pl-c1">=</span> (<span class="pl-s1">next_soc</span> <span class="pl-c1">-</span> <span class="pl-c1">0.5</span>)<span class="pl-c1">**</span><span class="pl-c1">2</span>
+
+        <span class="pl-s1">reward</span> <span class="pl-c1">=</span> <span class="pl-s1">self</span>.<span class="pl-c1">m1</span> <span class="pl-c1">*</span> <span class="pl-s1">profit_norm</span> <span class="pl-c1">-</span> <span class="pl-s1">self</span>.<span class="pl-c1">m2</span> <span class="pl-c1">*</span> <span class="pl-s1">soc_penalty</span>
+
+        <span class="pl-k">return</span> <span class="pl-en">float</span>(<span class="pl-s1">reward</span>)</pre></div>
+<p>该微电网环境是基于上一篇微电网模型进行构建，通过导入微电网数据 rm_data来构建模型，方便与后续构建的控制系统进行交互，该环境主要包含的方法如下：</p>
+<ol>
+<li><strong>reset()</strong> ：获取初始状态，当设置为训练模式时，会从测试数据中随机抽取一个时刻作为初始状态，在设置为测试模式时，使用最后两天的数据进行测试。</li>
+<li><strong>_normalize()</strong>：对状态进行归一化处理。</li>
+<li><strong>_clip_battery_action()</strong>：对控制系统输出的动作进行处理，防止储能系统超过约束限制。</li>
+<li><strong>step()</strong>：微电网环境执行控制系统给出的调度指令，生成下一时刻的状态、奖励等。</li>
+<li><strong>reward_function()</strong>：基于优化目标构建的奖励函数。</li>
+</ol></div>
+<div style="font-size:small;margin-top:8px;float:right;"></div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://kxmust.github.io">吃瓜的哲学</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","kxmust/kxmust.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+
+
+</html>
