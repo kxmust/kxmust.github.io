@@ -21,7 +21,7 @@
 <meta property="og:url" content="https://kxmust.github.io/post/shen-du-xue-xi-7-CNN-ji-chu.html">
 <meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
 <title>深度学习7-CNN基础</title>
-<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
 
 
 </head>
@@ -45,17 +45,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
     body {padding: 8px;}
     .postTitle{font-size:24px;}
 }
-.copy-feedback {
-    display: none;
-    position: absolute;
-    top: 10px;
-    right: 50px;
-    color: var(--color-fg-on-emphasis);
-    background-color: var(--color-fg-muted);
-    border-radius: 3px;
-    padding: 5px 8px;
-    font-size: 12px;
-}
+
 </style>
 
 
@@ -107,93 +97,98 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <h3>1.3 卷积的计算过程</h3>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/ff70a46e-a503-4d60-bf81-fae135372aff"><img src="https://github.com/user-attachments/assets/ff70a46e-a503-4d60-bf81-fae135372aff" alt="Image" style="max-width: 100%;"></a></p>
 <p>从0实现</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
-<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
-<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+<pre lang="python" class="notranslate"><code class="notranslate">import torch
+from torch import nn
+from d2l import torch as d2l
 
-<span class="pl-c"># 实现互相关运算</span>
-<span class="pl-k">def</span> <span class="pl-en">corr2d</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>): <span class="pl-c">#@save</span>
-    <span class="pl-s">"""计算二维互相关运算"""</span>
-    <span class="pl-s1">h</span>, <span class="pl-s1">w</span> <span class="pl-c1">=</span> <span class="pl-c1">K</span>.<span class="pl-c1">shape</span>
-    <span class="pl-c1">Y</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>((<span class="pl-c1">X</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]<span class="pl-c1">-</span> <span class="pl-s1">h</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, <span class="pl-c1">X</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">1</span>]<span class="pl-c1">-</span> <span class="pl-s1">w</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>))  <span class="pl-c"># 输出的维度</span>
-    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">Y</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]):
-        <span class="pl-k">for</span> <span class="pl-s1">j</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">Y</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">1</span>]):
-            <span class="pl-c1">Y</span>[<span class="pl-s1">i</span>, <span class="pl-s1">j</span>] <span class="pl-c1">=</span> (<span class="pl-c1">X</span>[<span class="pl-s1">i</span>:<span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-s1">h</span>, <span class="pl-s1">j</span>:<span class="pl-s1">j</span> <span class="pl-c1">+</span> <span class="pl-s1">w</span>] <span class="pl-c1">*</span> <span class="pl-c1">K</span>).<span class="pl-c1">sum</span>()
-    <span class="pl-k">return</span> <span class="pl-c1">Y</span>
+# 实现互相关运算
+def corr2d(X, K): #@save
+    """计算二维互相关运算"""
+    h, w = K.shape
+    Y = torch.zeros((X.shape[0]- h + 1, X.shape[1]- w + 1))  # 输出的维度
+    for i in range(Y.shape[0]):
+        for j in range(Y.shape[1]):
+            Y[i, j] = (X[i:i + h, j:j + w] * K).sum()
+    return Y
 
-<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0.0</span>, <span class="pl-c1">1.0</span>, <span class="pl-c1">2.0</span>], [<span class="pl-c1">3.0</span>, <span class="pl-c1">4.0</span>, <span class="pl-c1">5.0</span>], [<span class="pl-c1">6.0</span>, <span class="pl-c1">7.0</span>, <span class="pl-c1">8.0</span>]])
-<span class="pl-c1">K</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0.0</span>, <span class="pl-c1">1.0</span>], [<span class="pl-c1">2.0</span>, <span class="pl-c1">3.0</span>]])
-<span class="pl-en">corr2d</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>)</pre></div>
+X = torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])
+K = torch.tensor([[0.0, 1.0], [2.0, 3.0]])
+corr2d(X, K)
+</code></pre>
 <p>利用构建的corr2d函数构建卷积层</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">class</span> <span class="pl-v">Conv2D</span>(<span class="pl-s1">nn</span>.<span class="pl-c1">Module</span>):
-    <span class="pl-k">def</span> <span class="pl-en">__init__</span>(<span class="pl-s1">self</span>, <span class="pl-s1">kernel_size</span>):
-        <span class="pl-en">super</span>().<span class="pl-c1">__init__</span>()
-        <span class="pl-s1">self</span>.<span class="pl-c1">weight</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Parameter</span>(<span class="pl-s1">torch</span>.<span class="pl-c1">rand</span>(<span class="pl-s1">kernel_size</span>))
-        <span class="pl-s1">self</span>.<span class="pl-c1">bias</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Parameter</span>(<span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>(<span class="pl-c1">1</span>))
+<pre lang="python" class="notranslate"><code class="notranslate">class Conv2D(nn.Module):
+    def __init__(self, kernel_size):
+        super().__init__()
+        self.weight = nn.Parameter(torch.rand(kernel_size))
+        self.bias = nn.Parameter(torch.zeros(1))
         
-    <span class="pl-k">def</span> <span class="pl-en">forward</span>(<span class="pl-s1">self</span>, <span class="pl-s1">x</span>):
-        <span class="pl-k">return</span> <span class="pl-en">corr2d</span>(<span class="pl-s1">x</span>, <span class="pl-s1">self</span>.<span class="pl-c1">weight</span>) <span class="pl-c1">+</span> <span class="pl-s1">self</span>.<span class="pl-c1">bias</span></pre></div>
+    def forward(self, x):
+        return corr2d(x, self.weight) + self.bias
+</code></pre>
 <p>通过使用卷积核可以检测输入X的边<br>
 也可以给定输入和输出来学习一个K矩阵</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 构造一个二维卷积层，它具有1个输出通道和形状为（1，2）的卷积核</span>
-<span class="pl-s1">conv2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-c1">1</span>,<span class="pl-c1">1</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span>(<span class="pl-c1">1</span>, <span class="pl-c1">2</span>), <span class="pl-s1">bias</span><span class="pl-c1">=</span><span class="pl-c1">False</span>)
+<pre lang="python" class="notranslate"><code class="notranslate"># 构造一个二维卷积层，它具有1个输出通道和形状为（1，2）的卷积核
+conv2d = nn.Conv2d(1,1, kernel_size=(1, 2), bias=False)
 
-<span class="pl-c"># 这个二维卷积层使用四维输入和输出格式（批量大小、通道、高度、宽度），</span>
-<span class="pl-c"># 其中批量大小和通道数都为1</span>
-<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-c1">X</span>.<span class="pl-c1">reshape</span>((<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-c1">6</span>, <span class="pl-c1">8</span>))
-<span class="pl-c1">Y</span> <span class="pl-c1">=</span> <span class="pl-c1">Y</span>.<span class="pl-c1">reshape</span>((<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-c1">6</span>, <span class="pl-c1">7</span>))
-<span class="pl-s1">lr</span> <span class="pl-c1">=</span> <span class="pl-c1">3e-2</span> <span class="pl-c"># 学习率</span>
+# 这个二维卷积层使用四维输入和输出格式（批量大小、通道、高度、宽度），
+# 其中批量大小和通道数都为1
+X = X.reshape((1, 1, 6, 8))
+Y = Y.reshape((1, 1, 6, 7))
+lr = 3e-2 # 学习率
 
-<span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">10</span>):
-    <span class="pl-v">Y_hat</span> <span class="pl-c1">=</span> <span class="pl-en">conv2d</span>(<span class="pl-c1">X</span>)
-    <span class="pl-s1">l</span> <span class="pl-c1">=</span> (<span class="pl-v">Y_hat</span><span class="pl-c1">-</span> <span class="pl-c1">Y</span>) <span class="pl-c1">**</span> <span class="pl-c1">2</span>
-    <span class="pl-s1">conv2d</span>.<span class="pl-c1">zero_grad</span>()
-    <span class="pl-s1">l</span>.<span class="pl-c1">sum</span>().<span class="pl-c1">backward</span>()
-    <span class="pl-c"># 迭代卷积核</span>
-    <span class="pl-s1">conv2d</span>.<span class="pl-c1">weight</span>.<span class="pl-c1">data</span>[:]<span class="pl-c1">-=</span> <span class="pl-s1">lr</span> <span class="pl-c1">*</span> <span class="pl-s1">conv2d</span>.<span class="pl-c1">weight</span>.<span class="pl-c1">grad</span>   <span class="pl-c">#更新权重</span>
-    <span class="pl-k">if</span> (<span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>) <span class="pl-c1">%</span> <span class="pl-c1">2</span> <span class="pl-c1">==</span> <span class="pl-c1">0</span>:
-        <span class="pl-en">print</span>(<span class="pl-s">f'epoch <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">i</span><span class="pl-c1">+</span><span class="pl-c1">1</span><span class="pl-kos">}</span></span>, loss <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">l</span>.<span class="pl-c1">sum</span>():.3f<span class="pl-kos">}</span></span>'</span>)</pre></div>
+for i in range(10):
+    Y_hat = conv2d(X)
+    l = (Y_hat- Y) ** 2
+    conv2d.zero_grad()
+    l.sum().backward()
+    # 迭代卷积核
+    conv2d.weight.data[:]-= lr * conv2d.weight.grad   #更新权重
+    if (i + 1) % 2 == 0:
+        print(f'epoch {i+1}, loss {l.sum():.3f}')
+</code></pre>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/10.1CNN_layer.ipynb">代码链接</a></p>
 <h2>2 CNN的参数设置</h2>
 <h3>2.1 卷积核大小、填充和步幅</h3>
 <p>设置卷积核大小，以及填充padding，还有步幅<br>
 填充表示往输入周围填充0来保证输出的大小<br>
 步幅表示卷积核移动的步长</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 卷积核的大小, 填充0来控制输出维度的减少量, 步幅用来控制每次滑动窗口时滑动的行/列的步长可以成倍的减少输出形状</span>
-<span class="pl-k">import</span> <span class="pl-s1">torch</span>
-<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
+<pre lang="python" class="notranslate"><code class="notranslate"># 卷积核的大小, 填充0来控制输出维度的减少量, 步幅用来控制每次滑动窗口时滑动的行/列的步长可以成倍的减少输出形状
+import torch
+from torch import nn
 
-<span class="pl-c"># 为了方便起见，我们定义了一个计算卷积层的函数。</span>
-<span class="pl-c"># 此函数初始化卷积层权重，并对输入和输出提高和缩减相应的维数</span>
-<span class="pl-k">def</span> <span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>):
-    <span class="pl-c"># 这里的（1，1）表示批量大小和通道数都是1</span>
-    <span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-c1">X</span>.<span class="pl-c1">reshape</span>((<span class="pl-c1">1</span>, <span class="pl-c1">1</span>) <span class="pl-c1">+</span> <span class="pl-c1">X</span>.<span class="pl-c1">shape</span>)
-    <span class="pl-c1">Y</span> <span class="pl-c1">=</span> <span class="pl-en">conv2d</span>(<span class="pl-c1">X</span>)
+# 为了方便起见，我们定义了一个计算卷积层的函数。
+# 此函数初始化卷积层权重，并对输入和输出提高和缩减相应的维数
+def comp_conv2d(conv2d, X):
+    # 这里的（1，1）表示批量大小和通道数都是1
+    X = X.reshape((1, 1) + X.shape)
+    Y = conv2d(X)
     
-    <span class="pl-c"># 省略前两个维度：批量大小和通道</span>
-    <span class="pl-k">return</span> <span class="pl-c1">Y</span>.<span class="pl-c1">reshape</span>(<span class="pl-c1">Y</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">2</span>:])
+    # 省略前两个维度：批量大小和通道
+    return Y.reshape(Y.shape[2:])
     
-<span class="pl-c"># 请注意，padding=1这里每边都填充了1行或1列，因此总共添加了2行或2列</span>
-<span class="pl-c"># 第一个1表示输出通道,第二个1表示输入通道</span>
-<span class="pl-s1">conv2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span><span class="pl-c1">3</span>, <span class="pl-s1">padding</span><span class="pl-c1">=</span><span class="pl-c1">1</span>)
+# 请注意，padding=1这里每边都填充了1行或1列，因此总共添加了2行或2列
+# 第一个1表示输出通道,第二个1表示输入通道
+conv2d = nn.Conv2d(1, 1, kernel_size=3, padding=1)
 
-<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">rand</span>(<span class="pl-s1">size</span><span class="pl-c1">=</span>(<span class="pl-c1">8</span>,<span class="pl-c1">8</span>))
-<span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>).<span class="pl-c1">shape</span></pre></div>
+X = torch.rand(size=(8,8))
+comp_conv2d(conv2d, X).shape
+</code></pre>
 <p>通过设置卷积核大小，填充和步幅可以控制输出的维度<br>
 填充对输出维度的影响，计算过程如下：</p>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/9ec1876f-05f5-46b6-80c1-b75aa20efdba"><img src="https://github.com/user-attachments/assets/9ec1876f-05f5-46b6-80c1-b75aa20efdba" alt="Image" style="max-width: 100%;"></a></p>
 <p>步幅对输出维度的影响，计算过程如下：</p>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f3100731-9ec9-43fc-9935-5ea2f1541a47"><img src="https://github.com/user-attachments/assets/f3100731-9ec9-43fc-9935-5ea2f1541a47" alt="Image" style="max-width: 100%;"></a></p>
 <p>不同的卷积核大小，填充和步长的设置</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">conv2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span>(<span class="pl-c1">5</span>, <span class="pl-c1">3</span>), <span class="pl-s1">padding</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">1</span>))
-<span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>).<span class="pl-c1">shape</span>
+<pre lang="python" class="notranslate"><code class="notranslate">conv2d = nn.Conv2d(1, 1, kernel_size=(5, 3), padding=(2, 1))
+comp_conv2d(conv2d, X).shape
 
-<span class="pl-c"># 设置步幅为2</span>
-<span class="pl-s1">conv2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span><span class="pl-c1">3</span>, <span class="pl-s1">padding</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">stride</span><span class="pl-c1">=</span><span class="pl-c1">2</span>)
-<span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>).<span class="pl-c1">shape</span>
+# 设置步幅为2
+conv2d = nn.Conv2d(1, 1, kernel_size=3, padding=1, stride=2)
+comp_conv2d(conv2d, X).shape
 
-<span class="pl-s1">conv2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">Conv2d</span>(<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-s1">kernel_size</span><span class="pl-c1">=</span>(<span class="pl-c1">3</span>, <span class="pl-c1">5</span>), <span class="pl-s1">padding</span><span class="pl-c1">=</span>(<span class="pl-c1">0</span>, <span class="pl-c1">1</span>), <span class="pl-s1">stride</span><span class="pl-c1">=</span>(<span class="pl-c1">3</span>, <span class="pl-c1">4</span>))
-<span class="pl-en">comp_conv2d</span>(<span class="pl-s1">conv2d</span>, <span class="pl-c1">X</span>).<span class="pl-c1">shape</span></pre></div>
+conv2d = nn.Conv2d(1, 1, kernel_size=(3, 5), padding=(0, 1), stride=(3, 4))
+comp_conv2d(conv2d, X).shape
+</code></pre>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/10.2CNN_parameters.ipynb">代码链接</a></p>
 <h3>2.2 通道数</h3>
 <p>多个通道数的计算过程</p>
@@ -203,47 +198,50 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p>1x1的卷积核不会识别空间模式，只是融合通道，可以用作后续的特征融合</p>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/3a374491-65eb-4238-81e2-5036733ed3d9"><img src="https://github.com/user-attachments/assets/3a374491-65eb-4238-81e2-5036733ed3d9" alt="Image" style="max-width: 100%;"></a></p>
 <p>多个输入通道的从0实现</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 多输入通道</span>
-<span class="pl-k">import</span> <span class="pl-s1">torch</span>
-<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+<pre lang="python" class="notranslate"><code class="notranslate"># 多输入通道
+import torch
+from d2l import torch as d2l
 
-<span class="pl-k">def</span> <span class="pl-en">corr2d_multi_in</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>):
-    <span class="pl-c"># 先遍历“X”和“K”的第0个维度（通道维度），再把它们加在一起</span>
-    <span class="pl-k">return</span> <span class="pl-en">sum</span>(<span class="pl-s1">d2l</span>.<span class="pl-c1">corr2d</span>(<span class="pl-s1">x</span>, <span class="pl-s1">k</span>) <span class="pl-k">for</span> <span class="pl-s1">x</span>, <span class="pl-s1">k</span> <span class="pl-c1">in</span> <span class="pl-en">zip</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>))
+def corr2d_multi_in(X, K):
+    # 先遍历“X”和“K”的第0个维度（通道维度），再把它们加在一起
+    return sum(d2l.corr2d(x, k) for x, k in zip(X, K))
 
-<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[[<span class="pl-c1">0.0</span>, <span class="pl-c1">1.0</span>, <span class="pl-c1">2.0</span>], [<span class="pl-c1">3.0</span>, <span class="pl-c1">4.0</span>, <span class="pl-c1">5.0</span>], [<span class="pl-c1">6.0</span>, <span class="pl-c1">7.0</span>, <span class="pl-c1">8.0</span>]],
-                [[<span class="pl-c1">1.0</span>, <span class="pl-c1">2.0</span>, <span class="pl-c1">3.0</span>], [<span class="pl-c1">4.0</span>, <span class="pl-c1">5.0</span>, <span class="pl-c1">6.0</span>], [<span class="pl-c1">7.0</span>, <span class="pl-c1">8.0</span>, <span class="pl-c1">9.0</span>]]])
-<span class="pl-c1">K</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[[<span class="pl-c1">0.0</span>, <span class="pl-c1">1.0</span>], [<span class="pl-c1">2.0</span>, <span class="pl-c1">3.0</span>]], [[<span class="pl-c1">1.0</span>, <span class="pl-c1">2.0</span>], [<span class="pl-c1">3.0</span>, <span class="pl-c1">4.0</span>]]])
-<span class="pl-en">corr2d_multi_in</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>)</pre></div>
+X = torch.tensor([[[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]],
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]])
+K = torch.tensor([[[0.0, 1.0], [2.0, 3.0]], [[1.0, 2.0], [3.0, 4.0]]])
+corr2d_multi_in(X, K)
+</code></pre>
 <p>多输出通道的从0实现</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 多输出通道</span>
-<span class="pl-k">def</span> <span class="pl-en">corr2d_multi_in_out</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>):
-    <span class="pl-c"># 迭代“K”的第0个维度，每次都对输入“X”执行互相关运算。</span>
-    <span class="pl-c"># 最后将所有结果都叠加在一起</span>
-    <span class="pl-k">return</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>([<span class="pl-en">corr2d_multi_in</span>(<span class="pl-c1">X</span>, <span class="pl-s1">k</span>) <span class="pl-k">for</span> <span class="pl-s1">k</span> <span class="pl-c1">in</span> <span class="pl-c1">K</span>], <span class="pl-c1">0</span>)
+<pre lang="python" class="notranslate"><code class="notranslate"># 多输出通道
+def corr2d_multi_in_out(X, K):
+    # 迭代“K”的第0个维度，每次都对输入“X”执行互相关运算。
+    # 最后将所有结果都叠加在一起
+    return torch.stack([corr2d_multi_in(X, k) for k in K], 0)
 
-<span class="pl-c1">K</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>((<span class="pl-c1">K</span>, <span class="pl-c1">K</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, <span class="pl-c1">K</span> <span class="pl-c1">+</span> <span class="pl-c1">2</span>), <span class="pl-c1">0</span>)
-<span class="pl-c1">K</span>.<span class="pl-c1">shape</span>
+K = torch.stack((K, K + 1, K + 2), 0)
+K.shape
 
-<span class="pl-en">corr2d_multi_in_out</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>)</pre></div>
+corr2d_multi_in_out(X, K)
+</code></pre>
 <p>1X1的卷积核实现</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 1*1 的卷积核</span>
-<span class="pl-k">def</span> <span class="pl-en">corr2d_multi_in_out_1x1</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>):
-    <span class="pl-s1">c_i</span>, <span class="pl-s1">h</span>, <span class="pl-s1">w</span> <span class="pl-c1">=</span> <span class="pl-c1">X</span>.<span class="pl-c1">shape</span>
-    <span class="pl-s1">c_o</span> <span class="pl-c1">=</span> <span class="pl-c1">K</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]
-    <span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-c1">X</span>.<span class="pl-c1">reshape</span>((<span class="pl-s1">c_i</span>, <span class="pl-s1">h</span> <span class="pl-c1">*</span> <span class="pl-s1">w</span>))
-    <span class="pl-c1">K</span> <span class="pl-c1">=</span> <span class="pl-c1">K</span>.<span class="pl-c1">reshape</span>((<span class="pl-s1">c_o</span>, <span class="pl-s1">c_i</span>))
-    <span class="pl-c"># 全连接层中的矩阵乘法</span>
-    <span class="pl-c1">Y</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">matmul</span>(<span class="pl-c1">K</span>, <span class="pl-c1">X</span>)
-    <span class="pl-k">return</span> <span class="pl-c1">Y</span>.<span class="pl-c1">reshape</span>((<span class="pl-s1">c_o</span>, <span class="pl-s1">h</span>, <span class="pl-s1">w</span>))
+<pre lang="python" class="notranslate"><code class="notranslate"># 1*1 的卷积核
+def corr2d_multi_in_out_1x1(X, K):
+    c_i, h, w = X.shape
+    c_o = K.shape[0]
+    X = X.reshape((c_i, h * w))
+    K = K.reshape((c_o, c_i))
+    # 全连接层中的矩阵乘法
+    Y = torch.matmul(K, X)
+    return Y.reshape((c_o, h, w))
 
-<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">normal</span>(<span class="pl-c1">0</span>, <span class="pl-c1">1</span>, (<span class="pl-c1">3</span>, <span class="pl-c1">3</span>, <span class="pl-c1">3</span>))
-<span class="pl-c1">K</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">normal</span>(<span class="pl-c1">0</span>, <span class="pl-c1">1</span>, (<span class="pl-c1">2</span>, <span class="pl-c1">3</span>, <span class="pl-c1">1</span>, <span class="pl-c1">1</span>))
+X = torch.normal(0, 1, (3, 3, 3))
+K = torch.normal(0, 1, (2, 3, 1, 1))
 
-<span class="pl-v">Y1</span> <span class="pl-c1">=</span> <span class="pl-en">corr2d_multi_in_out_1x1</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>)
-<span class="pl-v">Y2</span> <span class="pl-c1">=</span> <span class="pl-en">corr2d_multi_in_out</span>(<span class="pl-c1">X</span>, <span class="pl-c1">K</span>)
-<span class="pl-k">assert</span> <span class="pl-en">float</span>(<span class="pl-s1">torch</span>.<span class="pl-c1">abs</span>(<span class="pl-v">Y1</span><span class="pl-c1">-</span> <span class="pl-v">Y2</span>).<span class="pl-c1">sum</span>()) <span class="pl-c1">&lt;</span> <span class="pl-c1">1e-6</span>
-<span class="pl-v">Y2</span></pre></div>
+Y1 = corr2d_multi_in_out_1x1(X, K)
+Y2 = corr2d_multi_in_out(X, K)
+assert float(torch.abs(Y1- Y2).sum()) &lt; 1e-6
+Y2
+</code></pre>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/10.3CNN_channel.ipynb">代码链接</a></p>
 <h2>3 池化层</h2>
 <p>池化层的作用有两个：<br>
@@ -254,46 +252,50 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <p>二维最大池化的过程</p>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/6d55fbfc-202d-479c-b977-ec7e9d7b65e6"><img src="https://github.com/user-attachments/assets/6d55fbfc-202d-479c-b977-ec7e9d7b65e6" alt="Image" style="max-width: 100%;"></a></p>
 <p>从0开始实现池化层</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
-<span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
-<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+<pre lang="python" class="notranslate"><code class="notranslate">import torch
+from torch import nn
+from d2l import torch as d2l
 
-<span class="pl-k">def</span> <span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>, <span class="pl-s1">pool_size</span>, <span class="pl-s1">mode</span><span class="pl-c1">=</span><span class="pl-s">'max'</span>):
-    <span class="pl-s1">p_h</span>, <span class="pl-s1">p_w</span> <span class="pl-c1">=</span> <span class="pl-s1">pool_size</span>
-    <span class="pl-c1">Y</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>((<span class="pl-c1">X</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]<span class="pl-c1">-</span> <span class="pl-s1">p_h</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>, <span class="pl-c1">X</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">1</span>]<span class="pl-c1">-</span> <span class="pl-s1">p_w</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>))   <span class="pl-c"># 输出的大小</span>
-    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">Y</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]):
-        <span class="pl-k">for</span> <span class="pl-s1">j</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-c1">Y</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">1</span>]):
-            <span class="pl-k">if</span> <span class="pl-s1">mode</span> <span class="pl-c1">==</span> <span class="pl-s">'max'</span>:
-                <span class="pl-c1">Y</span>[<span class="pl-s1">i</span>, <span class="pl-s1">j</span>] <span class="pl-c1">=</span> <span class="pl-c1">X</span>[<span class="pl-s1">i</span>: <span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-s1">p_h</span>, <span class="pl-s1">j</span>: <span class="pl-s1">j</span> <span class="pl-c1">+</span> <span class="pl-s1">p_w</span>].<span class="pl-c1">max</span>()
-            <span class="pl-k">elif</span> <span class="pl-s1">mode</span> <span class="pl-c1">==</span> <span class="pl-s">'avg'</span>:
-                <span class="pl-c1">Y</span>[<span class="pl-s1">i</span>, <span class="pl-s1">j</span>] <span class="pl-c1">=</span> <span class="pl-c1">X</span>[<span class="pl-s1">i</span>: <span class="pl-s1">i</span> <span class="pl-c1">+</span> <span class="pl-s1">p_h</span>, <span class="pl-s1">j</span>: <span class="pl-s1">j</span> <span class="pl-c1">+</span> <span class="pl-s1">p_w</span>].<span class="pl-c1">mean</span>()
-    <span class="pl-k">return</span> <span class="pl-c1">Y</span>
+def pool2d(X, pool_size, mode='max'):
+    p_h, p_w = pool_size
+    Y = torch.zeros((X.shape[0]- p_h + 1, X.shape[1]- p_w + 1))   # 输出的大小
+    for i in range(Y.shape[0]):
+        for j in range(Y.shape[1]):
+            if mode == 'max':
+                Y[i, j] = X[i: i + p_h, j: j + p_w].max()
+            elif mode == 'avg':
+                Y[i, j] = X[i: i + p_h, j: j + p_w].mean()
+    return Y
 
-<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0.0</span>, <span class="pl-c1">1.0</span>, <span class="pl-c1">2.0</span>], [<span class="pl-c1">3.0</span>, <span class="pl-c1">4.0</span>, <span class="pl-c1">5.0</span>], [<span class="pl-c1">6.0</span>, <span class="pl-c1">7.0</span>, <span class="pl-c1">8.0</span>]])
-<span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>, (<span class="pl-c1">2</span>, <span class="pl-c1">2</span>))
+X = torch.tensor([[0.0, 1.0, 2.0], [3.0, 4.0, 5.0], [6.0, 7.0, 8.0]])
+pool2d(X, (2, 2))
 
-<span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>, (<span class="pl-c1">2</span>, <span class="pl-c1">2</span>), <span class="pl-s">'avg'</span>)</pre></div>
+pool2d(X, (2, 2), 'avg')
+</code></pre>
 <p>用torch实现池化层</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">arange</span>(<span class="pl-c1">16</span>, <span class="pl-s1">dtype</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">float32</span>).<span class="pl-c1">reshape</span>(<span class="pl-c1">1</span>, <span class="pl-c1">1</span>, <span class="pl-c1">4</span>, <span class="pl-c1">4</span>)
-<span class="pl-c1">X</span>
+<pre lang="python" class="notranslate"><code class="notranslate">X = torch.arange(16, dtype = torch.float32).reshape(1, 1, 4, 4)
+X
 
-<span class="pl-c"># 深度学习框架中池化层的大小和步长是相同的</span>
-<span class="pl-s1">pool2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">MaxPool2d</span>(<span class="pl-c1">3</span>)
-<span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>)
+# 深度学习框架中池化层的大小和步长是相同的
+pool2d = nn.MaxPool2d(3)
+pool2d(X)
 
-<span class="pl-c">#设置填充为1，步长为2</span>
-<span class="pl-s1">pool2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">MaxPool2d</span>(<span class="pl-c1">3</span>, <span class="pl-s1">padding</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">stride</span><span class="pl-c1">=</span><span class="pl-c1">2</span>)
-<span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>)
+#设置填充为1，步长为2
+pool2d = nn.MaxPool2d(3, padding=1, stride=2)
+pool2d(X)
 
 
-<span class="pl-s1">pool2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">MaxPool2d</span>((<span class="pl-c1">2</span>,<span class="pl-c1">3</span>), <span class="pl-s1">padding</span><span class="pl-c1">=</span>(<span class="pl-c1">1</span>,<span class="pl-c1">1</span>), <span class="pl-s1">stride</span><span class="pl-c1">=</span>(<span class="pl-c1">2</span>, <span class="pl-c1">3</span>))
-<span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>)</pre></div>
+pool2d = nn.MaxPool2d((2,3), padding=(1,1), stride=(2, 3))
+pool2d(X)
+</code></pre>
 <p>多通道池化</p>
-<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-c1">X</span>, <span class="pl-c1">X</span><span class="pl-c1">+</span><span class="pl-c1">1</span>), <span class="pl-c1">1</span>)
-<span class="pl-c1">X</span>
+<pre lang="python" class="notranslate"><code class="notranslate">X = torch.cat((X, X+1), 1)
+X
 
-<span class="pl-s1">pool2d</span> <span class="pl-c1">=</span> <span class="pl-s1">nn</span>.<span class="pl-c1">MaxPool2d</span>(<span class="pl-c1">3</span>, <span class="pl-s1">padding</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">stride</span><span class="pl-c1">=</span><span class="pl-c1">2</span>)
-<span class="pl-en">pool2d</span>(<span class="pl-c1">X</span>)</pre></div>
+pool2d = nn.MaxPool2d(3, padding=1, stride=2)
+pool2d(X)
+
+</code></pre>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/10.4CNN_pool.ipynb">代码链接</a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
 
@@ -319,7 +321,7 @@ if(""!=""){
 </script></div>
 </body>
 <script>
-var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
 var utterancesLoad=0;
 
 let themeSettings={
@@ -392,70 +394,7 @@ function iFrameLoading(){
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const createClipboardHTML = (codeContent, additionalClasses = '') => `
-        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
-        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
-            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
-                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
-                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
-            </clipboard-copy>
-            <div class="copy-feedback">Copied!</div>
-        </div>
-    `;
 
-    const handleCodeElements = (selector = '') => {
-        document.querySelectorAll(selector).forEach(codeElement => {
-            const codeContent = codeElement.innerHTML;
-            const newStructure = document.createElement('div');
-            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
-            newStructure.innerHTML = createClipboardHTML(codeContent);
-
-            const parentElement = codeElement.parentElement;
-            if (selector.includes('highlight')) {
-                parentElement.insertBefore(newStructure, codeElement.nextSibling);
-                parentElement.removeChild(codeElement);
-            } else {
-                parentElement.parentElement.replaceChild(newStructure, parentElement);
-            }
-        });
-    };
-
-    handleCodeElements('pre.notranslate > code.notranslate');
-    handleCodeElements('div.highlight > pre.notranslate');
-
-    let currentFeedback = null;
-    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
-        copyButton.addEventListener('click', () => {
-            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
-            const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = codeContent;
-            document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextArea);
-
-            const copyIcon = copyButton.querySelector('.octicon-copy');
-            const checkIcon = copyButton.querySelector('.octicon-check');
-            const copyFeedback = copyButton.nextElementSibling;
-
-            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
-            currentFeedback = copyFeedback;
-
-            copyIcon.classList.add('d-none');
-            checkIcon.classList.remove('d-none');
-            copyFeedback.style.display = 'block';
-            copyButton.style.borderColor = 'var(--color-success-fg)';
-
-            setTimeout(() => {
-                copyIcon.classList.remove('d-none');
-                checkIcon.classList.add('d-none');
-                copyFeedback.style.display = 'none';
-                copyButton.style.borderColor = '';
-            }, 2000);
-        });
-    });
-});
 
 </script>
 
