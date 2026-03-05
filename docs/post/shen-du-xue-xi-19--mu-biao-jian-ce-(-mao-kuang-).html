@@ -173,7 +173,7 @@ def multibox_prior(data, sizes, ratios):
 <meta property="og:url" content="https://kxmust.github.io/post/shen-du-xue-xi-19--mu-biao-jian-ce-%28-mao-kuang-%29.html">
 <meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
 <title>深度学习19-目标检测(锚框)</title>
-
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
 
 
 </head>
@@ -197,7 +197,17 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
     body {padding: 8px;}
     .postTitle{font-size:24px;}
 }
-
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
 </style>
 
 
@@ -285,303 +295,290 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <li>每次生成的时候会给出多个s和多个r，但是不会一一组合，因为会生成大量的锚框，通常一般做法是用一个最合适的s和每个r进行一次组合，然后将后续的s与r1进行组合</li>
 <li>所以生成的锚框数量=s的个数+r的个数-1</li>
 </ul>
-<pre lang="python" class="notranslate"><code class="notranslate">%matplotlib inline
-import torch
-from d2l import torch as d2l
-torch.set_printoptions(2) # 精简输出精度
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c1">%</span><span class="pl-s1">matplotlib</span> <span class="pl-s1">inline</span>
+<span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">d2l</span> <span class="pl-k">import</span> <span class="pl-s1">torch</span> <span class="pl-k">as</span> <span class="pl-s1">d2l</span>
+<span class="pl-s1">torch</span>.<span class="pl-c1">set_printoptions</span>(<span class="pl-c1">2</span>) <span class="pl-c"># 精简输出精度</span>
 
-#@save
-# data 图片, size 锚框的大小，占图片的大小, ratio表示锚框的高宽比
-def multibox_prior(data, sizes, ratios):
-    """生成以每个像素为中心具有不同形状的锚框"""
-    in_height, in_width = data.shape[-2:]
-    device, num_sizes, num_ratios = data.device, len(sizes), len(ratios)
-    boxes_per_pixel = (num_sizes + num_ratios - 1)
-    size_tensor = torch.tensor(sizes, device=device)
-    ratio_tensor = torch.tensor(ratios, device=device)
+<span class="pl-c">#@save</span>
+<span class="pl-c"># data 图片, size 锚框的大小，占图片的大小, ratio表示锚框的高宽比</span>
+<span class="pl-k">def</span> <span class="pl-en">multibox_prior</span>(<span class="pl-s1">data</span>, <span class="pl-s1">sizes</span>, <span class="pl-s1">ratios</span>):
+    <span class="pl-s">"""生成以每个像素为中心具有不同形状的锚框"""</span>
+    <span class="pl-s1">in_height</span>, <span class="pl-s1">in_width</span> <span class="pl-c1">=</span> <span class="pl-s1">data</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">-</span><span class="pl-c1">2</span>:]
+    <span class="pl-s1">device</span>, <span class="pl-s1">num_sizes</span>, <span class="pl-s1">num_ratios</span> <span class="pl-c1">=</span> <span class="pl-s1">data</span>.<span class="pl-c1">device</span>, <span class="pl-en">len</span>(<span class="pl-s1">sizes</span>), <span class="pl-en">len</span>(<span class="pl-s1">ratios</span>)
+    <span class="pl-s1">boxes_per_pixel</span> <span class="pl-c1">=</span> (<span class="pl-s1">num_sizes</span> <span class="pl-c1">+</span> <span class="pl-s1">num_ratios</span> <span class="pl-c1">-</span> <span class="pl-c1">1</span>)
+    <span class="pl-s1">size_tensor</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>(<span class="pl-s1">sizes</span>, <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>)
+    <span class="pl-s1">ratio_tensor</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>(<span class="pl-s1">ratios</span>, <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>)
     
-    # 为了将锚点移动到像素的中心，需要设置偏移量。
-    # 因为一个像素的高为1且宽为1，我们选择偏移我们的中心0.5
-    offset_h, offset_w = 0.5, 0.5
-    steps_h = 1.0 / in_height # 在y轴上缩放步长
-    steps_w = 1.0 / in_width # 在x轴上缩放步长
+    <span class="pl-c"># 为了将锚点移动到像素的中心，需要设置偏移量。</span>
+    <span class="pl-c"># 因为一个像素的高为1且宽为1，我们选择偏移我们的中心0.5</span>
+    <span class="pl-s1">offset_h</span>, <span class="pl-s1">offset_w</span> <span class="pl-c1">=</span> <span class="pl-c1">0.5</span>, <span class="pl-c1">0.5</span>
+    <span class="pl-s1">steps_h</span> <span class="pl-c1">=</span> <span class="pl-c1">1.0</span> <span class="pl-c1">/</span> <span class="pl-s1">in_height</span> <span class="pl-c"># 在y轴上缩放步长</span>
+    <span class="pl-s1">steps_w</span> <span class="pl-c1">=</span> <span class="pl-c1">1.0</span> <span class="pl-c1">/</span> <span class="pl-s1">in_width</span> <span class="pl-c"># 在x轴上缩放步长</span>
     
-    # 生成锚框的所有中心点
-    center_h = (torch.arange(in_height, device=device) + offset_h) * steps_h
-    center_w = (torch.arange(in_width, device=device) + offset_w) * steps_w
-    shift_y, shift_x = torch.meshgrid(center_h, center_w, indexing='ij')
-    shift_y, shift_x = shift_y.reshape(-1), shift_x.reshape(-1)
+    <span class="pl-c"># 生成锚框的所有中心点</span>
+    <span class="pl-s1">center_h</span> <span class="pl-c1">=</span> (<span class="pl-s1">torch</span>.<span class="pl-c1">arange</span>(<span class="pl-s1">in_height</span>, <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>) <span class="pl-c1">+</span> <span class="pl-s1">offset_h</span>) <span class="pl-c1">*</span> <span class="pl-s1">steps_h</span>
+    <span class="pl-s1">center_w</span> <span class="pl-c1">=</span> (<span class="pl-s1">torch</span>.<span class="pl-c1">arange</span>(<span class="pl-s1">in_width</span>, <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>) <span class="pl-c1">+</span> <span class="pl-s1">offset_w</span>) <span class="pl-c1">*</span> <span class="pl-s1">steps_w</span>
+    <span class="pl-s1">shift_y</span>, <span class="pl-s1">shift_x</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">meshgrid</span>(<span class="pl-s1">center_h</span>, <span class="pl-s1">center_w</span>, <span class="pl-s1">indexing</span><span class="pl-c1">=</span><span class="pl-s">'ij'</span>)
+    <span class="pl-s1">shift_y</span>, <span class="pl-s1">shift_x</span> <span class="pl-c1">=</span> <span class="pl-s1">shift_y</span>.<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>), <span class="pl-s1">shift_x</span>.<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>)
     
-    # 生成“boxes_per_pixel”个高和宽，
-    # 之后用于创建锚框的四角坐标(xmin,xmax,ymin,ymax)
-    w = torch.cat((size_tensor * torch.sqrt(ratio_tensor[0]),
-            sizes[0] * torch.sqrt(ratio_tensor[1:])))\
-            * in_height / in_width # 处理矩形输入
-    h = torch.cat((size_tensor / torch.sqrt(ratio_tensor[0]),
-            sizes[0] / torch.sqrt(ratio_tensor[1:])))
+    <span class="pl-c"># 生成“boxes_per_pixel”个高和宽，</span>
+    <span class="pl-c"># 之后用于创建锚框的四角坐标(xmin,xmax,ymin,ymax)</span>
+    <span class="pl-s1">w</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-s1">size_tensor</span> <span class="pl-c1">*</span> <span class="pl-s1">torch</span>.<span class="pl-c1">sqrt</span>(<span class="pl-s1">ratio_tensor</span>[<span class="pl-c1">0</span>]),
+            <span class="pl-s1">sizes</span>[<span class="pl-c1">0</span>] <span class="pl-c1">*</span> <span class="pl-s1">torch</span>.<span class="pl-c1">sqrt</span>(<span class="pl-s1">ratio_tensor</span>[<span class="pl-c1">1</span>:])))\
+            <span class="pl-c1">*</span> <span class="pl-s1">in_height</span> <span class="pl-c1">/</span> <span class="pl-s1">in_width</span> <span class="pl-c"># 处理矩形输入</span>
+    <span class="pl-s1">h</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-s1">size_tensor</span> <span class="pl-c1">/</span> <span class="pl-s1">torch</span>.<span class="pl-c1">sqrt</span>(<span class="pl-s1">ratio_tensor</span>[<span class="pl-c1">0</span>]),
+            <span class="pl-s1">sizes</span>[<span class="pl-c1">0</span>] <span class="pl-c1">/</span> <span class="pl-s1">torch</span>.<span class="pl-c1">sqrt</span>(<span class="pl-s1">ratio_tensor</span>[<span class="pl-c1">1</span>:])))
     
-    # 除以2来获得半高和半宽
-    anchor_manipulations = torch.stack((-w, -h, w, h)).T.repeat(
-                        in_height * in_width, 1) / 2
+    <span class="pl-c"># 除以2来获得半高和半宽</span>
+    <span class="pl-s1">anchor_manipulations</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>((<span class="pl-c1">-</span><span class="pl-s1">w</span>, <span class="pl-c1">-</span><span class="pl-s1">h</span>, <span class="pl-s1">w</span>, <span class="pl-s1">h</span>)).<span class="pl-c1">T</span>.<span class="pl-c1">repeat</span>(
+                        <span class="pl-s1">in_height</span> <span class="pl-c1">*</span> <span class="pl-s1">in_width</span>, <span class="pl-c1">1</span>) <span class="pl-c1">/</span> <span class="pl-c1">2</span>
     
-    # 每个中心点都将有“boxes_per_pixel”个锚框，
-    # 所以生成含所有锚框中心的网格，重复了“boxes_per_pixel”次
-    out_grid = torch.stack([shift_x, shift_y, shift_x, shift_y],
-                dim=1).repeat_interleave(boxes_per_pixel, dim=0)
-    output = out_grid + anchor_manipulations
-    return output.unsqueeze(0)
+    <span class="pl-c"># 每个中心点都将有“boxes_per_pixel”个锚框，</span>
+    <span class="pl-c"># 所以生成含所有锚框中心的网格，重复了“boxes_per_pixel”次</span>
+    <span class="pl-s1">out_grid</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>([<span class="pl-s1">shift_x</span>, <span class="pl-s1">shift_y</span>, <span class="pl-s1">shift_x</span>, <span class="pl-s1">shift_y</span>],
+                <span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">1</span>).<span class="pl-c1">repeat_interleave</span>(<span class="pl-s1">boxes_per_pixel</span>, <span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">0</span>)
+    <span class="pl-s1">output</span> <span class="pl-c1">=</span> <span class="pl-s1">out_grid</span> <span class="pl-c1">+</span> <span class="pl-s1">anchor_manipulations</span>
+    <span class="pl-k">return</span> <span class="pl-s1">output</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-c1">0</span>)
 
-img = d2l.plt.imread('img/catdog.jpg')
-h, w = img.shape[:2]
-print(h, w)
-X = torch.rand(size=(1, 3, h, w))
-Y = multibox_prior(X, sizes=[0.75, 0.5, 0.25], ratios=[1, 2, 0.5])
-Y.shape
-</code></pre>
+<span class="pl-s1">img</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imread</span>(<span class="pl-s">'img/catdog.jpg'</span>)
+<span class="pl-s1">h</span>, <span class="pl-s1">w</span> <span class="pl-c1">=</span> <span class="pl-s1">img</span>.<span class="pl-c1">shape</span>[:<span class="pl-c1">2</span>]
+<span class="pl-en">print</span>(<span class="pl-s1">h</span>, <span class="pl-s1">w</span>)
+<span class="pl-c1">X</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">rand</span>(<span class="pl-s1">size</span><span class="pl-c1">=</span>(<span class="pl-c1">1</span>, <span class="pl-c1">3</span>, <span class="pl-s1">h</span>, <span class="pl-s1">w</span>))
+<span class="pl-c1">Y</span> <span class="pl-c1">=</span> <span class="pl-en">multibox_prior</span>(<span class="pl-c1">X</span>, <span class="pl-s1">sizes</span><span class="pl-c1">=</span>[<span class="pl-c1">0.75</span>, <span class="pl-c1">0.5</span>, <span class="pl-c1">0.25</span>], <span class="pl-s1">ratios</span><span class="pl-c1">=</span>[<span class="pl-c1">1</span>, <span class="pl-c1">2</span>, <span class="pl-c1">0.5</span>])
+<span class="pl-c1">Y</span>.<span class="pl-c1">shape</span></pre></div>
 <p>输出：<br>
 561 728<br>
 torch.Size([1, 2042040, 4])  生成了两百多万个锚框</p>
 <p>访问以(250, 250)为中心的第一个锚框</p>
-<pre lang="python" class="notranslate"><code class="notranslate">boxes = Y.reshape(h, w, 5, 4)
-boxes[250, 250, 0, :]
-</code></pre>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">boxes</span> <span class="pl-c1">=</span> <span class="pl-c1">Y</span>.<span class="pl-c1">reshape</span>(<span class="pl-s1">h</span>, <span class="pl-s1">w</span>, <span class="pl-c1">5</span>, <span class="pl-c1">4</span>)
+<span class="pl-s1">boxes</span>[<span class="pl-c1">250</span>, <span class="pl-c1">250</span>, <span class="pl-c1">0</span>, :]</pre></div>
 <p>输出：<br>
 tensor([0.06, 0.07, 0.63, 0.82])  # 已经除以高宽了</p>
 <p>显示以图像中一个像素为中心的所有锚框</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-def show_bboxes(axes, bboxes, labels=None, colors=None):
-    """显示所有边界框"""
-    def _make_list(obj, default_values=None):
-        if obj is None:
-            obj = default_values
-        elif not isinstance(obj, (list, tuple)):
-            obj = [obj]
-        return obj
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">show_bboxes</span>(<span class="pl-s1">axes</span>, <span class="pl-s1">bboxes</span>, <span class="pl-s1">labels</span><span class="pl-c1">=</span><span class="pl-c1">None</span>, <span class="pl-s1">colors</span><span class="pl-c1">=</span><span class="pl-c1">None</span>):
+    <span class="pl-s">"""显示所有边界框"""</span>
+    <span class="pl-k">def</span> <span class="pl-en">_make_list</span>(<span class="pl-s1">obj</span>, <span class="pl-s1">default_values</span><span class="pl-c1">=</span><span class="pl-c1">None</span>):
+        <span class="pl-k">if</span> <span class="pl-s1">obj</span> <span class="pl-c1">is</span> <span class="pl-c1">None</span>:
+            <span class="pl-s1">obj</span> <span class="pl-c1">=</span> <span class="pl-s1">default_values</span>
+        <span class="pl-k">elif</span> <span class="pl-c1">not</span> <span class="pl-en">isinstance</span>(<span class="pl-s1">obj</span>, (<span class="pl-s1">list</span>, <span class="pl-s1">tuple</span>)):
+            <span class="pl-s1">obj</span> <span class="pl-c1">=</span> [<span class="pl-s1">obj</span>]
+        <span class="pl-k">return</span> <span class="pl-s1">obj</span>
         
-    labels = _make_list(labels)
-    colors = _make_list(colors, ['b', 'g', 'r', 'm', 'c'])
-    for i, bbox in enumerate(bboxes):
-        color = colors[i % len(colors)]
-        rect = d2l.bbox_to_rect(bbox.detach().numpy(), color)
-        axes.add_patch(rect)
-        if labels and len(labels) &gt; i:
-            text_color = 'k' if color == 'w' else 'w'
-            axes.text(rect.xy[0], rect.xy[1], labels[i],
-                va='center', ha='center', fontsize=9, color=text_color,
-                bbox=dict(facecolor=color, lw=0))
+    <span class="pl-s1">labels</span> <span class="pl-c1">=</span> <span class="pl-en">_make_list</span>(<span class="pl-s1">labels</span>)
+    <span class="pl-s1">colors</span> <span class="pl-c1">=</span> <span class="pl-en">_make_list</span>(<span class="pl-s1">colors</span>, [<span class="pl-s">'b'</span>, <span class="pl-s">'g'</span>, <span class="pl-s">'r'</span>, <span class="pl-s">'m'</span>, <span class="pl-s">'c'</span>])
+    <span class="pl-k">for</span> <span class="pl-s1">i</span>, <span class="pl-s1">bbox</span> <span class="pl-c1">in</span> <span class="pl-en">enumerate</span>(<span class="pl-s1">bboxes</span>):
+        <span class="pl-s1">color</span> <span class="pl-c1">=</span> <span class="pl-s1">colors</span>[<span class="pl-s1">i</span> <span class="pl-c1">%</span> <span class="pl-en">len</span>(<span class="pl-s1">colors</span>)]
+        <span class="pl-s1">rect</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">bbox_to_rect</span>(<span class="pl-s1">bbox</span>.<span class="pl-c1">detach</span>().<span class="pl-c1">numpy</span>(), <span class="pl-s1">color</span>)
+        <span class="pl-s1">axes</span>.<span class="pl-c1">add_patch</span>(<span class="pl-s1">rect</span>)
+        <span class="pl-k">if</span> <span class="pl-s1">labels</span> <span class="pl-c1">and</span> <span class="pl-en">len</span>(<span class="pl-s1">labels</span>) <span class="pl-c1">&gt;</span> <span class="pl-s1">i</span>:
+            <span class="pl-s1">text_color</span> <span class="pl-c1">=</span> <span class="pl-s">'k'</span> <span class="pl-k">if</span> <span class="pl-s1">color</span> <span class="pl-c1">==</span> <span class="pl-s">'w'</span> <span class="pl-k">else</span> <span class="pl-s">'w'</span>
+            <span class="pl-s1">axes</span>.<span class="pl-c1">text</span>(<span class="pl-s1">rect</span>.<span class="pl-c1">xy</span>[<span class="pl-c1">0</span>], <span class="pl-s1">rect</span>.<span class="pl-c1">xy</span>[<span class="pl-c1">1</span>], <span class="pl-s1">labels</span>[<span class="pl-s1">i</span>],
+                <span class="pl-s1">va</span><span class="pl-c1">=</span><span class="pl-s">'center'</span>, <span class="pl-s1">ha</span><span class="pl-c1">=</span><span class="pl-s">'center'</span>, <span class="pl-s1">fontsize</span><span class="pl-c1">=</span><span class="pl-c1">9</span>, <span class="pl-s1">color</span><span class="pl-c1">=</span><span class="pl-s1">text_color</span>,
+                <span class="pl-s1">bbox</span><span class="pl-c1">=</span><span class="pl-en">dict</span>(<span class="pl-s1">facecolor</span><span class="pl-c1">=</span><span class="pl-s1">color</span>, <span class="pl-s1">lw</span><span class="pl-c1">=</span><span class="pl-c1">0</span>))
 
-d2l.set_figsize()
-bbox_scale = torch.tensor((w, h, w, h))
-fig = d2l.plt.imshow(img)
-show_bboxes(fig.axes, boxes[250, 250, :, :] * bbox_scale,
-    ['s=0.75, r=1', 's=0.5, r=1', 's=0.25, r=1', 's=0.75, r=2',
-    's=0.75, r=0.5'])
-</code></pre>
+<span class="pl-s1">d2l</span>.<span class="pl-c1">set_figsize</span>()
+<span class="pl-s1">bbox_scale</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>((<span class="pl-s1">w</span>, <span class="pl-s1">h</span>, <span class="pl-s1">w</span>, <span class="pl-s1">h</span>))
+<span class="pl-s1">fig</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>)
+<span class="pl-en">show_bboxes</span>(<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>, <span class="pl-s1">boxes</span>[<span class="pl-c1">250</span>, <span class="pl-c1">250</span>, :, :] <span class="pl-c1">*</span> <span class="pl-s1">bbox_scale</span>,
+    [<span class="pl-s">'s=0.75, r=1'</span>, <span class="pl-s">'s=0.5, r=1'</span>, <span class="pl-s">'s=0.25, r=1'</span>, <span class="pl-s">'s=0.75, r=2'</span>,
+    <span class="pl-s">'s=0.75, r=0.5'</span>])</pre></div>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/b9ed30d8-91d2-4c66-8b6a-381a52ef189e"><img src="https://github.com/user-attachments/assets/b9ed30d8-91d2-4c66-8b6a-381a52ef189e" alt="Image" style="max-width: 100%;"></a></p>
 <h3>2.2 给锚框进行标号</h3>
 <p>计算两个框的交并比</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-def box_iou(boxes1, boxes2):
-    """计算两个锚框或边界框列表中成对的交并比"""
-    box_area = lambda boxes: ((boxes[:, 2] - boxes[:, 0]) *
-        (boxes[:, 3] - boxes[:, 1]))
-    # boxes1,boxes2,areas1,areas2的形状:
-    # boxes1：(boxes1的数量,4),
-    # boxes2：(boxes2的数量,4),
-    # areas1：(boxes1的数量,),
-    # areas2：(boxes2的数量,)
-    areas1 = box_area(boxes1)
-    areas2 = box_area(boxes2)
-    # inter_upperlefts,inter_lowerrights,inters的形状:
-    # (boxes1的数量,boxes2的数量,2)
-    inter_upperlefts = torch.max(boxes1[:, None, :2], boxes2[:, :2])
-    inter_lowerrights = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])
-    inters = (inter_lowerrights - inter_upperlefts).clamp(min=0)
-    # inter_areasandunion_areas的形状:(boxes1的数量,boxes2的数量)
-    inter_areas = inters[:, :, 0] * inters[:, :, 1]
-    union_areas = areas1[:, None] + areas2 - inter_areas
-    return inter_areas / union_areas
-</code></pre>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">box_iou</span>(<span class="pl-s1">boxes1</span>, <span class="pl-s1">boxes2</span>):
+    <span class="pl-s">"""计算两个锚框或边界框列表中成对的交并比"""</span>
+    <span class="pl-s1">box_area</span> <span class="pl-c1">=</span> <span class="pl-k">lambda</span> <span class="pl-s1">boxes</span>: ((<span class="pl-s1">boxes</span>[:, <span class="pl-c1">2</span>] <span class="pl-c1">-</span> <span class="pl-s1">boxes</span>[:, <span class="pl-c1">0</span>]) <span class="pl-c1">*</span>
+        (<span class="pl-s1">boxes</span>[:, <span class="pl-c1">3</span>] <span class="pl-c1">-</span> <span class="pl-s1">boxes</span>[:, <span class="pl-c1">1</span>]))
+    <span class="pl-c"># boxes1,boxes2,areas1,areas2的形状:</span>
+    <span class="pl-c"># boxes1：(boxes1的数量,4),</span>
+    <span class="pl-c"># boxes2：(boxes2的数量,4),</span>
+    <span class="pl-c"># areas1：(boxes1的数量,),</span>
+    <span class="pl-c"># areas2：(boxes2的数量,)</span>
+    <span class="pl-s1">areas1</span> <span class="pl-c1">=</span> <span class="pl-en">box_area</span>(<span class="pl-s1">boxes1</span>)
+    <span class="pl-s1">areas2</span> <span class="pl-c1">=</span> <span class="pl-en">box_area</span>(<span class="pl-s1">boxes2</span>)
+    <span class="pl-c"># inter_upperlefts,inter_lowerrights,inters的形状:</span>
+    <span class="pl-c"># (boxes1的数量,boxes2的数量,2)</span>
+    <span class="pl-s1">inter_upperlefts</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">max</span>(<span class="pl-s1">boxes1</span>[:, <span class="pl-c1">None</span>, :<span class="pl-c1">2</span>], <span class="pl-s1">boxes2</span>[:, :<span class="pl-c1">2</span>])
+    <span class="pl-s1">inter_lowerrights</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">min</span>(<span class="pl-s1">boxes1</span>[:, <span class="pl-c1">None</span>, <span class="pl-c1">2</span>:], <span class="pl-s1">boxes2</span>[:, <span class="pl-c1">2</span>:])
+    <span class="pl-s1">inters</span> <span class="pl-c1">=</span> (<span class="pl-s1">inter_lowerrights</span> <span class="pl-c1">-</span> <span class="pl-s1">inter_upperlefts</span>).<span class="pl-c1">clamp</span>(<span class="pl-s1">min</span><span class="pl-c1">=</span><span class="pl-c1">0</span>)
+    <span class="pl-c"># inter_areasandunion_areas的形状:(boxes1的数量,boxes2的数量)</span>
+    <span class="pl-s1">inter_areas</span> <span class="pl-c1">=</span> <span class="pl-s1">inters</span>[:, :, <span class="pl-c1">0</span>] <span class="pl-c1">*</span> <span class="pl-s1">inters</span>[:, :, <span class="pl-c1">1</span>]
+    <span class="pl-s1">union_areas</span> <span class="pl-c1">=</span> <span class="pl-s1">areas1</span>[:, <span class="pl-c1">None</span>] <span class="pl-c1">+</span> <span class="pl-s1">areas2</span> <span class="pl-c1">-</span> <span class="pl-s1">inter_areas</span>
+    <span class="pl-k">return</span> <span class="pl-s1">inter_areas</span> <span class="pl-c1">/</span> <span class="pl-s1">union_areas</span></pre></div>
 <p>将最接近的真实边缘框分配给锚框</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-def assign_anchor_to_bbox(ground_truth, anchors, device, iou_threshold=0.5):
-    """将最接近的真实边界框分配给锚框"""
-    num_anchors, num_gt_boxes = anchors.shape[0], ground_truth.shape[0]
-    # 位于第i行和第j列的元素x_ij是锚框i和真实边界框j的IoU
-    jaccard = box_iou(anchors, ground_truth)
-    # 对于每个锚框，分配的真实边界框的张量
-    anchors_bbox_map = torch.full((num_anchors,), -1, dtype=torch.long,
-                    device=device)
-    # 根据阈值，决定是否分配真实边界框
-    max_ious, indices = torch.max(jaccard, dim=1)
-    anc_i = torch.nonzero(max_ious &gt;= iou_threshold).reshape(-1)
-    box_j = indices[max_ious &gt;= iou_threshold]
-    anchors_bbox_map[anc_i] = box_j
-    col_discard = torch.full((num_anchors,), -1)
-    row_discard = torch.full((num_gt_boxes,), -1)
-    for _ in range(num_gt_boxes):
-        max_idx = torch.argmax(jaccard)
-        box_idx = (max_idx % num_gt_boxes).long()
-        anc_idx = (max_idx / num_gt_boxes).long()
-        anchors_bbox_map[anc_idx] = box_idx
-        jaccard[:, box_idx] = col_discard
-        jaccard[anc_idx, :] = row_discard
-    return anchors_bbox_map
-</code></pre>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">assign_anchor_to_bbox</span>(<span class="pl-s1">ground_truth</span>, <span class="pl-s1">anchors</span>, <span class="pl-s1">device</span>, <span class="pl-s1">iou_threshold</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>):
+    <span class="pl-s">"""将最接近的真实边界框分配给锚框"""</span>
+    <span class="pl-s1">num_anchors</span>, <span class="pl-s1">num_gt_boxes</span> <span class="pl-c1">=</span> <span class="pl-s1">anchors</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>], <span class="pl-s1">ground_truth</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]
+    <span class="pl-c"># 位于第i行和第j列的元素x_ij是锚框i和真实边界框j的IoU</span>
+    <span class="pl-s1">jaccard</span> <span class="pl-c1">=</span> <span class="pl-en">box_iou</span>(<span class="pl-s1">anchors</span>, <span class="pl-s1">ground_truth</span>)
+    <span class="pl-c"># 对于每个锚框，分配的真实边界框的张量</span>
+    <span class="pl-s1">anchors_bbox_map</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">full</span>((<span class="pl-s1">num_anchors</span>,), <span class="pl-c1">-</span><span class="pl-c1">1</span>, <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">long</span>,
+                    <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>)
+    <span class="pl-c"># 根据阈值，决定是否分配真实边界框</span>
+    <span class="pl-s1">max_ious</span>, <span class="pl-s1">indices</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">max</span>(<span class="pl-s1">jaccard</span>, <span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">1</span>)
+    <span class="pl-s1">anc_i</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">nonzero</span>(<span class="pl-s1">max_ious</span> <span class="pl-c1">&gt;=</span> <span class="pl-s1">iou_threshold</span>).<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>)
+    <span class="pl-s1">box_j</span> <span class="pl-c1">=</span> <span class="pl-s1">indices</span>[<span class="pl-s1">max_ious</span> <span class="pl-c1">&gt;=</span> <span class="pl-s1">iou_threshold</span>]
+    <span class="pl-s1">anchors_bbox_map</span>[<span class="pl-s1">anc_i</span>] <span class="pl-c1">=</span> <span class="pl-s1">box_j</span>
+    <span class="pl-s1">col_discard</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">full</span>((<span class="pl-s1">num_anchors</span>,), <span class="pl-c1">-</span><span class="pl-c1">1</span>)
+    <span class="pl-s1">row_discard</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">full</span>((<span class="pl-s1">num_gt_boxes</span>,), <span class="pl-c1">-</span><span class="pl-c1">1</span>)
+    <span class="pl-k">for</span> <span class="pl-s1">_</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">num_gt_boxes</span>):
+        <span class="pl-s1">max_idx</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">argmax</span>(<span class="pl-s1">jaccard</span>)
+        <span class="pl-s1">box_idx</span> <span class="pl-c1">=</span> (<span class="pl-s1">max_idx</span> <span class="pl-c1">%</span> <span class="pl-s1">num_gt_boxes</span>).<span class="pl-c1">long</span>()
+        <span class="pl-s1">anc_idx</span> <span class="pl-c1">=</span> (<span class="pl-s1">max_idx</span> <span class="pl-c1">/</span> <span class="pl-s1">num_gt_boxes</span>).<span class="pl-c1">long</span>()
+        <span class="pl-s1">anchors_bbox_map</span>[<span class="pl-s1">anc_idx</span>] <span class="pl-c1">=</span> <span class="pl-s1">box_idx</span>
+        <span class="pl-s1">jaccard</span>[:, <span class="pl-s1">box_idx</span>] <span class="pl-c1">=</span> <span class="pl-s1">col_discard</span>
+        <span class="pl-s1">jaccard</span>[<span class="pl-s1">anc_idx</span>, :] <span class="pl-c1">=</span> <span class="pl-s1">row_discard</span>
+    <span class="pl-k">return</span> <span class="pl-s1">anchors_bbox_map</span></pre></div>
 <p>标记类和偏移</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-# 让机器学习算法更好的预测，计算偏移
-def offset_boxes(anchors, assigned_bb, eps=1e-6):
-    """对锚框偏移量的转换"""
-    c_anc = d2l.box_corner_to_center(anchors)
-    c_assigned_bb = d2l.box_corner_to_center(assigned_bb)
-    offset_xy = 10 * (c_assigned_bb[:, :2] - c_anc[:, :2]) / c_anc[:, 2:]
-    offset_wh = 5 * torch.log(eps + c_assigned_bb[:, 2:] / c_anc[:, 2:])
-    offset = torch.cat([offset_xy, offset_wh], axis=1)
-    return offset
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-c"># 让机器学习算法更好的预测，计算偏移</span>
+<span class="pl-k">def</span> <span class="pl-en">offset_boxes</span>(<span class="pl-s1">anchors</span>, <span class="pl-s1">assigned_bb</span>, <span class="pl-s1">eps</span><span class="pl-c1">=</span><span class="pl-c1">1e-6</span>):
+    <span class="pl-s">"""对锚框偏移量的转换"""</span>
+    <span class="pl-s1">c_anc</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">box_corner_to_center</span>(<span class="pl-s1">anchors</span>)
+    <span class="pl-s1">c_assigned_bb</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">box_corner_to_center</span>(<span class="pl-s1">assigned_bb</span>)
+    <span class="pl-s1">offset_xy</span> <span class="pl-c1">=</span> <span class="pl-c1">10</span> <span class="pl-c1">*</span> (<span class="pl-s1">c_assigned_bb</span>[:, :<span class="pl-c1">2</span>] <span class="pl-c1">-</span> <span class="pl-s1">c_anc</span>[:, :<span class="pl-c1">2</span>]) <span class="pl-c1">/</span> <span class="pl-s1">c_anc</span>[:, <span class="pl-c1">2</span>:]
+    <span class="pl-s1">offset_wh</span> <span class="pl-c1">=</span> <span class="pl-c1">5</span> <span class="pl-c1">*</span> <span class="pl-s1">torch</span>.<span class="pl-c1">log</span>(<span class="pl-s1">eps</span> <span class="pl-c1">+</span> <span class="pl-s1">c_assigned_bb</span>[:, <span class="pl-c1">2</span>:] <span class="pl-c1">/</span> <span class="pl-s1">c_anc</span>[:, <span class="pl-c1">2</span>:])
+    <span class="pl-s1">offset</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>([<span class="pl-s1">offset_xy</span>, <span class="pl-s1">offset_wh</span>], <span class="pl-s1">axis</span><span class="pl-c1">=</span><span class="pl-c1">1</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">offset</span>
 
-# 这个用来返回类别和偏移
-#@save
-def multibox_target(anchors, labels):
-    """使用真实边界框标记锚框"""
-    batch_size, anchors = labels.shape[0], anchors.squeeze(0)
-    batch_offset, batch_mask, batch_class_labels = [], [], []
-    device, num_anchors = anchors.device, anchors.shape[0]
-    for i in range(batch_size):
-        label = labels[i, :, :]
-        anchors_bbox_map = assign_anchor_to_bbox(
-            label[:, 1:], anchors, device)
-        bbox_mask = ((anchors_bbox_map &gt;= 0).float().unsqueeze(-1)).repeat(
-            1, 4)
-        # 将类标签和分配的边界框坐标初始化为零
-        class_labels = torch.zeros(num_anchors, dtype=torch.long,
-                        device=device)
-        assigned_bb = torch.zeros((num_anchors, 4), dtype=torch.float32,
-                        device=device)
-        # 使用真实边界框来标记锚框的类别。
-        # 如果一个锚框没有被分配，标记其为背景（值为零）
-        indices_true = torch.nonzero(anchors_bbox_map &gt;= 0)
-        bb_idx = anchors_bbox_map[indices_true]
-        class_labels[indices_true] = label[bb_idx, 0].long() + 1
-        assigned_bb[indices_true] = label[bb_idx, 1:]
-        # 偏移量转换
-        offset = offset_boxes(anchors, assigned_bb) * bbox_mask
-        batch_offset.append(offset.reshape(-1))
-        batch_mask.append(bbox_mask.reshape(-1))
-        batch_class_labels.append(class_labels)
-    bbox_offset = torch.stack(batch_offset)
-    bbox_mask = torch.stack(batch_mask)
-    class_labels = torch.stack(batch_class_labels)
-    # bbox_offest 表示每一个anchor到真实框的offset
-    # bbox_mask=0 表示这个锚框是背景框,不用进行预测, 等于1表示对应一个真实的边框
-    # class_label表示锚框对应的类别标号
-    return (bbox_offset, bbox_mask, class_labels) 
-</code></pre>
+<span class="pl-c"># 这个用来返回类别和偏移</span>
+<span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">multibox_target</span>(<span class="pl-s1">anchors</span>, <span class="pl-s1">labels</span>):
+    <span class="pl-s">"""使用真实边界框标记锚框"""</span>
+    <span class="pl-s1">batch_size</span>, <span class="pl-s1">anchors</span> <span class="pl-c1">=</span> <span class="pl-s1">labels</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>], <span class="pl-s1">anchors</span>.<span class="pl-c1">squeeze</span>(<span class="pl-c1">0</span>)
+    <span class="pl-s1">batch_offset</span>, <span class="pl-s1">batch_mask</span>, <span class="pl-s1">batch_class_labels</span> <span class="pl-c1">=</span> [], [], []
+    <span class="pl-s1">device</span>, <span class="pl-s1">num_anchors</span> <span class="pl-c1">=</span> <span class="pl-s1">anchors</span>.<span class="pl-c1">device</span>, <span class="pl-s1">anchors</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]
+    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">batch_size</span>):
+        <span class="pl-s1">label</span> <span class="pl-c1">=</span> <span class="pl-s1">labels</span>[<span class="pl-s1">i</span>, :, :]
+        <span class="pl-s1">anchors_bbox_map</span> <span class="pl-c1">=</span> <span class="pl-en">assign_anchor_to_bbox</span>(
+            <span class="pl-s1">label</span>[:, <span class="pl-c1">1</span>:], <span class="pl-s1">anchors</span>, <span class="pl-s1">device</span>)
+        <span class="pl-s1">bbox_mask</span> <span class="pl-c1">=</span> ((<span class="pl-s1">anchors_bbox_map</span> <span class="pl-c1">&gt;=</span> <span class="pl-c1">0</span>).<span class="pl-c1">float</span>().<span class="pl-c1">unsqueeze</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>)).<span class="pl-c1">repeat</span>(
+            <span class="pl-c1">1</span>, <span class="pl-c1">4</span>)
+        <span class="pl-c"># 将类标签和分配的边界框坐标初始化为零</span>
+        <span class="pl-s1">class_labels</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>(<span class="pl-s1">num_anchors</span>, <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">long</span>,
+                        <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>)
+        <span class="pl-s1">assigned_bb</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">zeros</span>((<span class="pl-s1">num_anchors</span>, <span class="pl-c1">4</span>), <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">float32</span>,
+                        <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>)
+        <span class="pl-c"># 使用真实边界框来标记锚框的类别。</span>
+        <span class="pl-c"># 如果一个锚框没有被分配，标记其为背景（值为零）</span>
+        <span class="pl-s1">indices_true</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">nonzero</span>(<span class="pl-s1">anchors_bbox_map</span> <span class="pl-c1">&gt;=</span> <span class="pl-c1">0</span>)
+        <span class="pl-s1">bb_idx</span> <span class="pl-c1">=</span> <span class="pl-s1">anchors_bbox_map</span>[<span class="pl-s1">indices_true</span>]
+        <span class="pl-s1">class_labels</span>[<span class="pl-s1">indices_true</span>] <span class="pl-c1">=</span> <span class="pl-s1">label</span>[<span class="pl-s1">bb_idx</span>, <span class="pl-c1">0</span>].<span class="pl-c1">long</span>() <span class="pl-c1">+</span> <span class="pl-c1">1</span>
+        <span class="pl-s1">assigned_bb</span>[<span class="pl-s1">indices_true</span>] <span class="pl-c1">=</span> <span class="pl-s1">label</span>[<span class="pl-s1">bb_idx</span>, <span class="pl-c1">1</span>:]
+        <span class="pl-c"># 偏移量转换</span>
+        <span class="pl-s1">offset</span> <span class="pl-c1">=</span> <span class="pl-en">offset_boxes</span>(<span class="pl-s1">anchors</span>, <span class="pl-s1">assigned_bb</span>) <span class="pl-c1">*</span> <span class="pl-s1">bbox_mask</span>
+        <span class="pl-s1">batch_offset</span>.<span class="pl-c1">append</span>(<span class="pl-s1">offset</span>.<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>))
+        <span class="pl-s1">batch_mask</span>.<span class="pl-c1">append</span>(<span class="pl-s1">bbox_mask</span>.<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>))
+        <span class="pl-s1">batch_class_labels</span>.<span class="pl-c1">append</span>(<span class="pl-s1">class_labels</span>)
+    <span class="pl-s1">bbox_offset</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>(<span class="pl-s1">batch_offset</span>)
+    <span class="pl-s1">bbox_mask</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>(<span class="pl-s1">batch_mask</span>)
+    <span class="pl-s1">class_labels</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>(<span class="pl-s1">batch_class_labels</span>)
+    <span class="pl-c"># bbox_offest 表示每一个anchor到真实框的offset</span>
+    <span class="pl-c"># bbox_mask=0 表示这个锚框是背景框,不用进行预测, 等于1表示对应一个真实的边框</span>
+    <span class="pl-c"># class_label表示锚框对应的类别标号</span>
+    <span class="pl-k">return</span> (<span class="pl-s1">bbox_offset</span>, <span class="pl-s1">bbox_mask</span>, <span class="pl-s1">class_labels</span>) </pre></div>
 <p>给个样例显示一下：</p>
-<pre lang="python" class="notranslate"><code class="notranslate">ground_truth = torch.tensor([[0, 0.1, 0.08, 0.52, 0.92],
-            [1, 0.55, 0.2, 0.9, 0.88]])
-anchors = torch.tensor([[0, 0.1, 0.2, 0.3], [0.15, 0.2, 0.4, 0.4],
-                [0.63, 0.05, 0.88, 0.98], [0.66, 0.45, 0.8, 0.8],
-                [0.57, 0.3, 0.92, 0.9]])
-fig = d2l.plt.imshow(img)
-show_bboxes(fig.axes, ground_truth[:, 1:] * bbox_scale, ['dog', 'cat'], 'k')
-show_bboxes(fig.axes, anchors * bbox_scale, ['0', '1', '2', '3', '4']);
-</code></pre>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">ground_truth</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0</span>, <span class="pl-c1">0.1</span>, <span class="pl-c1">0.08</span>, <span class="pl-c1">0.52</span>, <span class="pl-c1">0.92</span>],
+            [<span class="pl-c1">1</span>, <span class="pl-c1">0.55</span>, <span class="pl-c1">0.2</span>, <span class="pl-c1">0.9</span>, <span class="pl-c1">0.88</span>]])
+<span class="pl-s1">anchors</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0</span>, <span class="pl-c1">0.1</span>, <span class="pl-c1">0.2</span>, <span class="pl-c1">0.3</span>], [<span class="pl-c1">0.15</span>, <span class="pl-c1">0.2</span>, <span class="pl-c1">0.4</span>, <span class="pl-c1">0.4</span>],
+                [<span class="pl-c1">0.63</span>, <span class="pl-c1">0.05</span>, <span class="pl-c1">0.88</span>, <span class="pl-c1">0.98</span>], [<span class="pl-c1">0.66</span>, <span class="pl-c1">0.45</span>, <span class="pl-c1">0.8</span>, <span class="pl-c1">0.8</span>],
+                [<span class="pl-c1">0.57</span>, <span class="pl-c1">0.3</span>, <span class="pl-c1">0.92</span>, <span class="pl-c1">0.9</span>]])
+<span class="pl-s1">fig</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>)
+<span class="pl-en">show_bboxes</span>(<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>, <span class="pl-s1">ground_truth</span>[:, <span class="pl-c1">1</span>:] <span class="pl-c1">*</span> <span class="pl-s1">bbox_scale</span>, [<span class="pl-s">'dog'</span>, <span class="pl-s">'cat'</span>], <span class="pl-s">'k'</span>)
+<span class="pl-en">show_bboxes</span>(<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>, <span class="pl-s1">anchors</span> <span class="pl-c1">*</span> <span class="pl-s1">bbox_scale</span>, [<span class="pl-s">'0'</span>, <span class="pl-s">'1'</span>, <span class="pl-s">'2'</span>, <span class="pl-s">'3'</span>, <span class="pl-s">'4'</span>]);</pre></div>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/6eec5daf-f7fb-4be1-a622-9b2834f3d2a9"><img src="https://github.com/user-attachments/assets/6eec5daf-f7fb-4be1-a622-9b2834f3d2a9" alt="Image" style="max-width: 100%;"></a></p>
 <p>运行上述函数</p>
-<pre lang="python" class="notranslate"><code class="notranslate">labels = multibox_target(anchors.unsqueeze(dim=0),
-            ground_truth.unsqueeze(dim=0))
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">labels</span> <span class="pl-c1">=</span> <span class="pl-en">multibox_target</span>(<span class="pl-s1">anchors</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">0</span>),
+            <span class="pl-s1">ground_truth</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">0</span>))
 
-labels[2]  # 输出类别
-</code></pre>
+<span class="pl-s1">labels</span>[<span class="pl-c1">2</span>]  <span class="pl-c"># 输出类别</span></pre></div>
 <p>输出：tensor([[0, 1, 2, 0, 2]]) #0表示背景，1表示狗，2表示猫</p>
 <h3>2.3 利用NMS进行预测</h3>
 <p>根据带有预测偏移的锚框来预测边缘框</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-def offset_inverse(anchors, offset_preds):
-    """根据带有预测偏移量的锚框来预测边界框"""
-    anc = d2l.box_corner_to_center(anchors)
-    pred_bbox_xy = (offset_preds[:, :2] * anc[:, 2:] / 10) + anc[:, :2]
-    pred_bbox_wh = torch.exp(offset_preds[:, 2:] / 5) * anc[:, 2:]
-    pred_bbox = torch.cat((pred_bbox_xy, pred_bbox_wh), axis=1)
-    predicted_bbox = d2l.box_center_to_corner(pred_bbox)
-    return predicted_bbox
-</code></pre>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">offset_inverse</span>(<span class="pl-s1">anchors</span>, <span class="pl-s1">offset_preds</span>):
+    <span class="pl-s">"""根据带有预测偏移量的锚框来预测边界框"""</span>
+    <span class="pl-s1">anc</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">box_corner_to_center</span>(<span class="pl-s1">anchors</span>)
+    <span class="pl-s1">pred_bbox_xy</span> <span class="pl-c1">=</span> (<span class="pl-s1">offset_preds</span>[:, :<span class="pl-c1">2</span>] <span class="pl-c1">*</span> <span class="pl-s1">anc</span>[:, <span class="pl-c1">2</span>:] <span class="pl-c1">/</span> <span class="pl-c1">10</span>) <span class="pl-c1">+</span> <span class="pl-s1">anc</span>[:, :<span class="pl-c1">2</span>]
+    <span class="pl-s1">pred_bbox_wh</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">exp</span>(<span class="pl-s1">offset_preds</span>[:, <span class="pl-c1">2</span>:] <span class="pl-c1">/</span> <span class="pl-c1">5</span>) <span class="pl-c1">*</span> <span class="pl-s1">anc</span>[:, <span class="pl-c1">2</span>:]
+    <span class="pl-s1">pred_bbox</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-s1">pred_bbox_xy</span>, <span class="pl-s1">pred_bbox_wh</span>), <span class="pl-s1">axis</span><span class="pl-c1">=</span><span class="pl-c1">1</span>)
+    <span class="pl-s1">predicted_bbox</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">box_center_to_corner</span>(<span class="pl-s1">pred_bbox</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">predicted_bbox</span></pre></div>
 <p>NMS算法</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-def nms(boxes, scores, iou_threshold):
-    """对预测边界框的置信度进行排序"""
-    B = torch.argsort(scores, dim=-1, descending=True)
-    keep = [] # 保留预测边界框的指标
-    while B.numel() &gt; 0:
-        i = B[0]
-        keep.append(i)
-        if B.numel() == 1: break
-        iou = box_iou(boxes[i, :].reshape(-1, 4),
-                    boxes[B[1:], :].reshape(-1, 4)).reshape(-1)
-        inds = torch.nonzero(iou &lt;= iou_threshold).reshape(-1)
-        B = B[inds + 1]
-    return torch.tensor(keep, device=boxes.device)
-</code></pre>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">nms</span>(<span class="pl-s1">boxes</span>, <span class="pl-s1">scores</span>, <span class="pl-s1">iou_threshold</span>):
+    <span class="pl-s">"""对预测边界框的置信度进行排序"""</span>
+    <span class="pl-c1">B</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">argsort</span>(<span class="pl-s1">scores</span>, <span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">-</span><span class="pl-c1">1</span>, <span class="pl-s1">descending</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
+    <span class="pl-s1">keep</span> <span class="pl-c1">=</span> [] <span class="pl-c"># 保留预测边界框的指标</span>
+    <span class="pl-k">while</span> <span class="pl-c1">B</span>.<span class="pl-c1">numel</span>() <span class="pl-c1">&gt;</span> <span class="pl-c1">0</span>:
+        <span class="pl-s1">i</span> <span class="pl-c1">=</span> <span class="pl-c1">B</span>[<span class="pl-c1">0</span>]
+        <span class="pl-s1">keep</span>.<span class="pl-c1">append</span>(<span class="pl-s1">i</span>)
+        <span class="pl-k">if</span> <span class="pl-c1">B</span>.<span class="pl-c1">numel</span>() <span class="pl-c1">==</span> <span class="pl-c1">1</span>: <span class="pl-k">break</span>
+        <span class="pl-s1">iou</span> <span class="pl-c1">=</span> <span class="pl-en">box_iou</span>(<span class="pl-s1">boxes</span>[<span class="pl-s1">i</span>, :].<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>, <span class="pl-c1">4</span>),
+                    <span class="pl-s1">boxes</span>[<span class="pl-c1">B</span>[<span class="pl-c1">1</span>:], :].<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>, <span class="pl-c1">4</span>)).<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>)
+        <span class="pl-s1">inds</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">nonzero</span>(<span class="pl-s1">iou</span> <span class="pl-c1">&lt;=</span> <span class="pl-s1">iou_threshold</span>).<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>)
+        <span class="pl-c1">B</span> <span class="pl-c1">=</span> <span class="pl-c1">B</span>[<span class="pl-s1">inds</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>]
+    <span class="pl-k">return</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>(<span class="pl-s1">keep</span>, <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">boxes</span>.<span class="pl-c1">device</span>)</pre></div>
 <p>利用NMS来预测边缘框</p>
-<pre lang="python" class="notranslate"><code class="notranslate">#@save
-def multibox_detection(cls_probs, offset_preds, anchors, nms_threshold=0.5,
-                    pos_threshold=0.009999999):
-    """使用非极大值抑制来预测边界框"""
-    device, batch_size = cls_probs.device, cls_probs.shape[0]
-    anchors = anchors.squeeze(0)
-    num_classes, num_anchors = cls_probs.shape[1], cls_probs.shape[2]
-    out = []
-    for i in range(batch_size):
-        cls_prob, offset_pred = cls_probs[i], offset_preds[i].reshape(-1, 4)
-        conf, class_id = torch.max(cls_prob[1:], 0)
-        predicted_bb = offset_inverse(anchors, offset_pred)
-        keep = nms(predicted_bb, conf, nms_threshold)
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c">#@save</span>
+<span class="pl-k">def</span> <span class="pl-en">multibox_detection</span>(<span class="pl-s1">cls_probs</span>, <span class="pl-s1">offset_preds</span>, <span class="pl-s1">anchors</span>, <span class="pl-s1">nms_threshold</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>,
+                    <span class="pl-s1">pos_threshold</span><span class="pl-c1">=</span><span class="pl-c1">0.009999999</span>):
+    <span class="pl-s">"""使用非极大值抑制来预测边界框"""</span>
+    <span class="pl-s1">device</span>, <span class="pl-s1">batch_size</span> <span class="pl-c1">=</span> <span class="pl-s1">cls_probs</span>.<span class="pl-c1">device</span>, <span class="pl-s1">cls_probs</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">0</span>]
+    <span class="pl-s1">anchors</span> <span class="pl-c1">=</span> <span class="pl-s1">anchors</span>.<span class="pl-c1">squeeze</span>(<span class="pl-c1">0</span>)
+    <span class="pl-s1">num_classes</span>, <span class="pl-s1">num_anchors</span> <span class="pl-c1">=</span> <span class="pl-s1">cls_probs</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">1</span>], <span class="pl-s1">cls_probs</span>.<span class="pl-c1">shape</span>[<span class="pl-c1">2</span>]
+    <span class="pl-s1">out</span> <span class="pl-c1">=</span> []
+    <span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-en">range</span>(<span class="pl-s1">batch_size</span>):
+        <span class="pl-s1">cls_prob</span>, <span class="pl-s1">offset_pred</span> <span class="pl-c1">=</span> <span class="pl-s1">cls_probs</span>[<span class="pl-s1">i</span>], <span class="pl-s1">offset_preds</span>[<span class="pl-s1">i</span>].<span class="pl-c1">reshape</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>, <span class="pl-c1">4</span>)
+        <span class="pl-s1">conf</span>, <span class="pl-s1">class_id</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">max</span>(<span class="pl-s1">cls_prob</span>[<span class="pl-c1">1</span>:], <span class="pl-c1">0</span>)
+        <span class="pl-s1">predicted_bb</span> <span class="pl-c1">=</span> <span class="pl-en">offset_inverse</span>(<span class="pl-s1">anchors</span>, <span class="pl-s1">offset_pred</span>)
+        <span class="pl-s1">keep</span> <span class="pl-c1">=</span> <span class="pl-en">nms</span>(<span class="pl-s1">predicted_bb</span>, <span class="pl-s1">conf</span>, <span class="pl-s1">nms_threshold</span>)
         
-        # 找到所有的non_keep索引，并将类设置为背景
-        all_idx = torch.arange(num_anchors, dtype=torch.long, device=device)
-        combined = torch.cat((keep, all_idx))
-        uniques, counts = combined.unique(return_counts=True)
-        non_keep = uniques[counts == 1]
-        all_id_sorted = torch.cat((keep, non_keep))
-        class_id[non_keep] = -1
-        class_id = class_id[all_id_sorted]
-        conf, predicted_bb = conf[all_id_sorted], predicted_bb[all_id_sorted]
-        # pos_threshold是一个用于非背景预测的阈值
-        below_min_idx = (conf &lt; pos_threshold)
-        class_id[below_min_idx] = -1
-        conf[below_min_idx] = 1 - conf[below_min_idx]
-        pred_info = torch.cat((class_id.unsqueeze(1),
-            conf.unsqueeze(1),
-            predicted_bb), dim=1)
-        out.append(pred_info)
-    return torch.stack(out)
-</code></pre>
+        <span class="pl-c"># 找到所有的non_keep索引，并将类设置为背景</span>
+        <span class="pl-s1">all_idx</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">arange</span>(<span class="pl-s1">num_anchors</span>, <span class="pl-s1">dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">long</span>, <span class="pl-s1">device</span><span class="pl-c1">=</span><span class="pl-s1">device</span>)
+        <span class="pl-s1">combined</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-s1">keep</span>, <span class="pl-s1">all_idx</span>))
+        <span class="pl-s1">uniques</span>, <span class="pl-s1">counts</span> <span class="pl-c1">=</span> <span class="pl-s1">combined</span>.<span class="pl-c1">unique</span>(<span class="pl-s1">return_counts</span><span class="pl-c1">=</span><span class="pl-c1">True</span>)
+        <span class="pl-s1">non_keep</span> <span class="pl-c1">=</span> <span class="pl-s1">uniques</span>[<span class="pl-s1">counts</span> <span class="pl-c1">==</span> <span class="pl-c1">1</span>]
+        <span class="pl-s1">all_id_sorted</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-s1">keep</span>, <span class="pl-s1">non_keep</span>))
+        <span class="pl-s1">class_id</span>[<span class="pl-s1">non_keep</span>] <span class="pl-c1">=</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>
+        <span class="pl-s1">class_id</span> <span class="pl-c1">=</span> <span class="pl-s1">class_id</span>[<span class="pl-s1">all_id_sorted</span>]
+        <span class="pl-s1">conf</span>, <span class="pl-s1">predicted_bb</span> <span class="pl-c1">=</span> <span class="pl-s1">conf</span>[<span class="pl-s1">all_id_sorted</span>], <span class="pl-s1">predicted_bb</span>[<span class="pl-s1">all_id_sorted</span>]
+        <span class="pl-c"># pos_threshold是一个用于非背景预测的阈值</span>
+        <span class="pl-s1">below_min_idx</span> <span class="pl-c1">=</span> (<span class="pl-s1">conf</span> <span class="pl-c1">&lt;</span> <span class="pl-s1">pos_threshold</span>)
+        <span class="pl-s1">class_id</span>[<span class="pl-s1">below_min_idx</span>] <span class="pl-c1">=</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>
+        <span class="pl-s1">conf</span>[<span class="pl-s1">below_min_idx</span>] <span class="pl-c1">=</span> <span class="pl-c1">1</span> <span class="pl-c1">-</span> <span class="pl-s1">conf</span>[<span class="pl-s1">below_min_idx</span>]
+        <span class="pl-s1">pred_info</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">cat</span>((<span class="pl-s1">class_id</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-c1">1</span>),
+            <span class="pl-s1">conf</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-c1">1</span>),
+            <span class="pl-s1">predicted_bb</span>), <span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">1</span>)
+        <span class="pl-s1">out</span>.<span class="pl-c1">append</span>(<span class="pl-s1">pred_info</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">torch</span>.<span class="pl-c1">stack</span>(<span class="pl-s1">out</span>)</pre></div>
 <p>演示一下：</p>
-<pre lang="python" class="notranslate"><code class="notranslate">anchors = torch.tensor([[0.1, 0.08, 0.52, 0.92], [0.08, 0.2, 0.56, 0.95],
-    [0.15, 0.3, 0.62, 0.91], [0.55, 0.2, 0.9, 0.88]])
-offset_preds = torch.tensor([0] * anchors.numel())
-cls_probs = torch.tensor([[0] * 4, # 背景的预测概率
-                [0.9, 0.8, 0.7, 0.1], # 狗的预测概率
-                [0.1, 0.2, 0.3, 0.9]]) # 猫的预测概率
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">anchors</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0.1</span>, <span class="pl-c1">0.08</span>, <span class="pl-c1">0.52</span>, <span class="pl-c1">0.92</span>], [<span class="pl-c1">0.08</span>, <span class="pl-c1">0.2</span>, <span class="pl-c1">0.56</span>, <span class="pl-c1">0.95</span>],
+    [<span class="pl-c1">0.15</span>, <span class="pl-c1">0.3</span>, <span class="pl-c1">0.62</span>, <span class="pl-c1">0.91</span>], [<span class="pl-c1">0.55</span>, <span class="pl-c1">0.2</span>, <span class="pl-c1">0.9</span>, <span class="pl-c1">0.88</span>]])
+<span class="pl-s1">offset_preds</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([<span class="pl-c1">0</span>] <span class="pl-c1">*</span> <span class="pl-s1">anchors</span>.<span class="pl-c1">numel</span>())
+<span class="pl-s1">cls_probs</span> <span class="pl-c1">=</span> <span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>([[<span class="pl-c1">0</span>] <span class="pl-c1">*</span> <span class="pl-c1">4</span>, <span class="pl-c"># 背景的预测概率</span>
+                [<span class="pl-c1">0.9</span>, <span class="pl-c1">0.8</span>, <span class="pl-c1">0.7</span>, <span class="pl-c1">0.1</span>], <span class="pl-c"># 狗的预测概率</span>
+                [<span class="pl-c1">0.1</span>, <span class="pl-c1">0.2</span>, <span class="pl-c1">0.3</span>, <span class="pl-c1">0.9</span>]]) <span class="pl-c"># 猫的预测概率</span>
 
-fig = d2l.plt.imshow(img)
-show_bboxes(fig.axes, anchors * bbox_scale,
-        ['dog=0.9', 'dog=0.8', 'dog=0.7', 'cat=0.9'])
-</code></pre>
+<span class="pl-s1">fig</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>)
+<span class="pl-en">show_bboxes</span>(<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>, <span class="pl-s1">anchors</span> <span class="pl-c1">*</span> <span class="pl-s1">bbox_scale</span>,
+        [<span class="pl-s">'dog=0.9'</span>, <span class="pl-s">'dog=0.8'</span>, <span class="pl-s">'dog=0.7'</span>, <span class="pl-s">'cat=0.9'</span>])</pre></div>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/8266e247-15e7-4b90-a93c-685ef61618e7"><img src="https://github.com/user-attachments/assets/8266e247-15e7-4b90-a93c-685ef61618e7" alt="Image" style="max-width: 100%;"></a></p>
-<pre lang="python" class="notranslate"><code class="notranslate">output = multibox_detection(cls_probs.unsqueeze(dim=0),
-        offset_preds.unsqueeze(dim=0),
-        anchors.unsqueeze(dim=0),
-        nms_threshold=0.5)
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">output</span> <span class="pl-c1">=</span> <span class="pl-en">multibox_detection</span>(<span class="pl-s1">cls_probs</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">0</span>),
+        <span class="pl-s1">offset_preds</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">0</span>),
+        <span class="pl-s1">anchors</span>.<span class="pl-c1">unsqueeze</span>(<span class="pl-s1">dim</span><span class="pl-c1">=</span><span class="pl-c1">0</span>),
+        <span class="pl-s1">nms_threshold</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>)
 
-fig = d2l.plt.imshow(img)
-for i in output[0].detach().numpy():
-    if i[0] == -1:
-        continue
-    label = ('dog=', 'cat=')[int(i[0])] + str(i[1])
-    show_bboxes(fig.axes, [torch.tensor(i[2:]) * bbox_scale], label)
-</code></pre>
+<span class="pl-s1">fig</span> <span class="pl-c1">=</span> <span class="pl-s1">d2l</span>.<span class="pl-c1">plt</span>.<span class="pl-c1">imshow</span>(<span class="pl-s1">img</span>)
+<span class="pl-k">for</span> <span class="pl-s1">i</span> <span class="pl-c1">in</span> <span class="pl-s1">output</span>[<span class="pl-c1">0</span>].<span class="pl-c1">detach</span>().<span class="pl-c1">numpy</span>():
+    <span class="pl-k">if</span> <span class="pl-s1">i</span>[<span class="pl-c1">0</span>] <span class="pl-c1">==</span> <span class="pl-c1">-</span><span class="pl-c1">1</span>:
+        <span class="pl-k">continue</span>
+    <span class="pl-s1">label</span> <span class="pl-c1">=</span> (<span class="pl-s">'dog='</span>, <span class="pl-s">'cat='</span>)[<span class="pl-en">int</span>(<span class="pl-s1">i</span>[<span class="pl-c1">0</span>])] <span class="pl-c1">+</span> <span class="pl-en">str</span>(<span class="pl-s1">i</span>[<span class="pl-c1">1</span>])
+    <span class="pl-en">show_bboxes</span>(<span class="pl-s1">fig</span>.<span class="pl-c1">axes</span>, [<span class="pl-s1">torch</span>.<span class="pl-c1">tensor</span>(<span class="pl-s1">i</span>[<span class="pl-c1">2</span>:]) <span class="pl-c1">*</span> <span class="pl-s1">bbox_scale</span>], <span class="pl-s1">label</span>)</pre></div>
 <p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/0be5d0bb-7093-4dbd-a3ae-0839a63d89fc"><img src="https://github.com/user-attachments/assets/0be5d0bb-7093-4dbd-a3ae-0839a63d89fc" alt="Image" style="max-width: 100%;"></a></p>
 <p><a href="https://github.com/kxmust/Deep_learning_note/blob/main/21.3anchor_box.ipynb">代码链接</a></p></div>
 <div style="font-size:small;margin-top:8px;float:right;"></div>
@@ -608,7 +605,7 @@ if(""!=""){
 </script></div>
 </body>
 <script>
-var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'};
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
 var utterancesLoad=0;
 
 let themeSettings={
@@ -682,7 +679,70 @@ function iFrameLoading(){
     }
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
 
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
 
 </script>
 
