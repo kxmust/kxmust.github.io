@@ -1,5 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>吃瓜的哲学</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>吃瓜的哲学</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Wed, 15 Apr 2026 03:58:20 +0000</lastBuildDate><managingEditor>吃瓜的哲学</managingEditor><ttl>60</ttl><webMaster>吃瓜的哲学</webMaster><item><title>LLM(2)：大语言模型的本地部署</title><link>https://kxmust.github.io/post/LLM%282%29%EF%BC%9A-da-yu-yan-mo-xing-de-ben-di-bu-shu.html</link><description># 1 现有大模型的基本架构
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>吃瓜的哲学</title><link>https://kxmust.github.io</link><description>乐观是一种生活态度，保持学习和记录。</description><copyright>吃瓜的哲学</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://avatars.githubusercontent.com/u/99197662?v=4</url><title>avatar</title><link>https://kxmust.github.io</link></image><lastBuildDate>Wed, 15 Apr 2026 04:06:31 +0000</lastBuildDate><managingEditor>吃瓜的哲学</managingEditor><ttl>60</ttl><webMaster>吃瓜的哲学</webMaster><item><title>LLM(3)：大语言模型微调实战（LoRA）</title><link>https://kxmust.github.io/post/LLM%283%29%EF%BC%9A-da-yu-yan-mo-xing-wei-diao-shi-zhan-%EF%BC%88LoRA%EF%BC%89.html</link><description># 1 关于微调的核心认知
+
+## 1.1为什么需要微调
+
+大语言模型的训练通常包含预训练（Pre-training）和微调（Fine-tuning）两个主要阶段：
+
+- **预训练**：赋予了模型广泛的通用知识和语言理解能力，但它缺乏针对特定任务的专业深度。</description><guid isPermaLink="true">https://kxmust.github.io/post/LLM%283%29%EF%BC%9A-da-yu-yan-mo-xing-wei-diao-shi-zhan-%EF%BC%88LoRA%EF%BC%89.html</guid><pubDate>Wed, 15 Apr 2026 04:06:03 +0000</pubDate></item><item><title>LLM(2)：大语言模型的本地部署</title><link>https://kxmust.github.io/post/LLM%282%29%EF%BC%9A-da-yu-yan-mo-xing-de-ben-di-bu-shu.html</link><description># 1 现有大模型的基本架构
 
 ## 1.1 现有 LLM 采用的是什么架构
 
