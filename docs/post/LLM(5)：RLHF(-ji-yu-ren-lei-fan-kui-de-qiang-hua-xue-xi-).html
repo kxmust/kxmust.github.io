@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://avatars.githubusercontent.com/u/99197662?v=4"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="从提示词工程（怎么用）、本地部署（怎么跑）、数据合成（怎么造数据）、LoRA 微调（怎么教新知识），一直到最后的Reinforcement Learning from Human Feedback，RLHF（怎么立规矩），这正是目前业界训练顶级大模型（如 ChatGPT, Llama 3）的标准范式。">
+<meta property="og:title" content="LLM(5)：RLHF(基于人类反馈的强化学习)">
+<meta property="og:description" content="从提示词工程（怎么用）、本地部署（怎么跑）、数据合成（怎么造数据）、LoRA 微调（怎么教新知识），一直到最后的Reinforcement Learning from Human Feedback，RLHF（怎么立规矩），这正是目前业界训练顶级大模型（如 ChatGPT, Llama 3）的标准范式。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://kxmust.github.io/post/LLM%285%29%EF%BC%9ARLHF%28-ji-yu-ren-lei-fan-kui-de-qiang-hua-xue-xi-%29.html">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/99197662?v=4">
+<title>LLM(5)：RLHF(基于人类反馈的强化学习)</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">LLM(5)：RLHF(基于人类反馈的强化学习)</h1>
+<div class="title-right">
+    <a href="https://kxmust.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/kxmust/kxmust.github.io/issues/28" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><p>从提示词工程（怎么用）、本地部署（怎么跑）、数据合成（怎么造数据）、LoRA 微调（怎么教新知识），一直到最后的Reinforcement Learning from Human Feedback，RLHF（怎么立规矩），这正是目前业界训练顶级大模型（如 ChatGPT, Llama 3）的标准范式。</p>
+<p>RLHF 相当于给模型“做礼仪培训+价值观调教”。在 RLHF 中，大模型本身就是那个“智能体（Agent）”，我们用强化学习算法（主要是 GRPO）来优化它的输出策略。</p>
+<p>其核心内容可以分为三步：</p>
+<ul>
+<li><strong>人类打分</strong>：对模型回答排好坏（哪个更有用、更安全、更礼貌）。</li>
+<li><strong>训练奖励模型（RM）</strong>：让模型学会 “什么是好回答”。</li>
+<li><strong>强化学习（GRPO）</strong>：让模型不断优化，往人类喜欢的方向调整。</li>
+</ul>
+<p>输出结果：<strong>模型更安全、更有用、更符合人类偏好，不乱说、不冒犯、更贴心。</strong></p>
+<h1>前提条件</h1>
+<p>LLM 的训练流程如下：</p>
+<ol>
+<li><strong>预训练</strong>：让模型<strong>学会知识</strong></li>
+<li><strong>SFT</strong>：让模型<strong>学会对话</strong></li>
+<li><strong>RLHF</strong>：让模型<strong>学会好好说话、说人话</strong></li>
+</ol>
+<p>在进入 RLHF 之前，我们假设模型已经通过 LoRA 微调 学习了基于 self-instruct 合成的问答数据。此时的模型具备了基本的对话能力，我们称之为 SFT 模型（Policy Model 的初始状态）。</p>
+<h1>第一步：人类打分</h1>
+<p><strong>核心目的</strong>：收集数据，告诉机器“人类更偏好什么样的回答”。</p>
+<p><strong>具体过程</strong>：</p>
+<ol>
+<li>从题库中抽一个提示词（Prompt）。</li>
+<li>让当前的 SFT 模型生成几个不同的回答。</li>
+<li>人类（或更强大的大模型，即 AI Feedback）根据有用性、安全性、礼貌程度，对这些回答进行排序（Chosen vs Rejected）。</li>
+</ol>
+<p>数据结构示例：</p>
+<div class="highlight highlight-source-json"><pre class="notranslate">[
+  {
+    <span class="pl-ent">"prompt"</span>: <span class="pl-s"><span class="pl-pds">"</span>老师，请问什么是梯度下降？<span class="pl-pds">"</span></span>,
+    <span class="pl-ent">"chosen"</span>: <span class="pl-s"><span class="pl-pds">"</span>梯度下降是一种优化算法，就像下山一样，通过计算损失函数的导数，一步步找到最低点。<span class="pl-pds">"</span></span>,
+    <span class="pl-ent">"rejected"</span>: <span class="pl-s"><span class="pl-pds">"</span>就是求导找极小值，这你都不知道吗？<span class="pl-pds">"</span></span>
+  },
+  {
+    <span class="pl-ent">"prompt"</span>: <span class="pl-s"><span class="pl-pds">"</span>写一段 Python 冒泡排序。<span class="pl-pds">"</span></span>,
+    <span class="pl-ent">"chosen"</span>: <span class="pl-s"><span class="pl-pds">"</span>好的，这是一种基础的排序算法，代码如下：...<span class="pl-pds">"</span></span>,
+    <span class="pl-ent">"rejected"</span>: <span class="pl-s"><span class="pl-pds">"</span>去百度搜一下就知道了，干嘛问我。<span class="pl-pds">"</span></span>
+  },
+  {
+    <span class="pl-ent">"prompt"</span>: <span class="pl-s"><span class="pl-pds">"</span>如何评价一部电影的好坏？<span class="pl-pds">"</span></span>,
+    <span class="pl-ent">"chosen"</span>: <span class="pl-s"><span class="pl-pds">"</span>评价一部电影可以从多个维度进行，例如剧情连贯性、演员演技、镜头语言和配乐等。<span class="pl-pds">"</span></span>,
+    <span class="pl-ent">"rejected"</span>: <span class="pl-s"><span class="pl-pds">"</span>好就是好，不好就是不好，哪有那么多废话。<span class="pl-pds">"</span></span>
+  }
+]</pre></div>
+<h1>第二步：训练奖励模型（RM）</h1>
+<p><strong>核心目的</strong>：训练一个“裁判模型”，让它学会人类的打分标准。因为在强化学习阶段，我们需要实时给大模型的成千上万次回答打分，不可能全靠人工。</p>
+<p><strong>具体过程</strong>：<br>
+我们将 SFT 模型的输出层去掉，换成一个线性回归层（输出一个标量分数）。我们输入<code class="notranslate">(Prompt, Response)</code>，模型输出一个分数$R$。</p>
+<p>它的损失函数基于 Bradley-Terry 模型，目标是让好回答的分数远大于坏回答的分数：</p>
+<p>$$
+Loss = -\log(\sigma(R(chosen) - R(rejected)))
+$$</p>
+<p>好回答的分数越大，Loss 会越小。</p>
+<p>我们使用 Trl 库中的RewardTrainer来训练奖励模型</p>
+<h2>1 导入并处理数据集</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">transformers</span> <span class="pl-k">import</span> <span class="pl-v">AutoModelForSequenceClassification</span>, <span class="pl-v">AutoTokenizer</span>, <span class="pl-v">AutoModelForCausalLM</span>
+<span class="pl-k">from</span> <span class="pl-s1">peft</span> <span class="pl-k">import</span> <span class="pl-v">LoraConfig</span>, <span class="pl-s1">get_peft_model</span>, <span class="pl-v">PeftModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">trl</span> <span class="pl-k">import</span> <span class="pl-v">RewardTrainer</span>, <span class="pl-v">RewardConfig</span>
+<span class="pl-k">from</span> <span class="pl-s1">datasets</span> <span class="pl-k">import</span> <span class="pl-s1">load_dataset</span>
+
+<span class="pl-c"># 1. 导入并处理数据集</span>
+<span class="pl-c"># 导入数据集</span>
+<span class="pl-s1">raw_dataset</span> <span class="pl-c1">=</span> <span class="pl-en">load_dataset</span>(<span class="pl-s">"json"</span>, <span class="pl-s1">data_files</span><span class="pl-c1">=</span><span class="pl-s">'RLHF_dataset.json'</span>)
+
+<span class="pl-c"># 将数据集切分为训练集 (90%) 和验证集 (10%)，用于监控模型是否真正学会了打分</span>
+<span class="pl-s1">split_dataset</span> <span class="pl-c1">=</span> <span class="pl-s1">raw_dataset</span>[<span class="pl-s">"train"</span>].<span class="pl-c1">train_test_split</span>(<span class="pl-s1">test_size</span><span class="pl-c1">=</span><span class="pl-c1">0.1</span>, <span class="pl-s1">seed</span><span class="pl-c1">=</span><span class="pl-c1">42</span>)
+
+<span class="pl-c"># 对数据做字符串的拼接！</span>
+<span class="pl-k">def</span> <span class="pl-en">format_dataset</span>(<span class="pl-s1">examples</span>):
+    <span class="pl-s1">formatted</span> <span class="pl-c1">=</span> {
+        <span class="pl-s">"chosen"</span>: [],
+        <span class="pl-s">"rejected"</span>: []
+    }
+    <span class="pl-k">for</span> <span class="pl-s1">p</span>, <span class="pl-s1">c</span>, <span class="pl-s1">r</span> <span class="pl-c1">in</span> <span class="pl-en">zip</span>(<span class="pl-s1">examples</span>[<span class="pl-s">"prompt"</span>], <span class="pl-s1">examples</span>[<span class="pl-s">"chosen"</span>], <span class="pl-s1">examples</span>[<span class="pl-s">"rejected"</span>]):
+        <span class="pl-s1">formatted</span>[<span class="pl-s">"chosen"</span>].<span class="pl-c1">append</span>(<span class="pl-s">f"User: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">p</span><span class="pl-kos">}</span></span><span class="pl-cce">\n</span>Assistant: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">c</span><span class="pl-kos">}</span></span>"</span>)
+        <span class="pl-s1">formatted</span>[<span class="pl-s">"rejected"</span>].<span class="pl-c1">append</span>(<span class="pl-s">f"User: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">p</span><span class="pl-kos">}</span></span><span class="pl-cce">\n</span>Assistant: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">r</span><span class="pl-kos">}</span></span>"</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">formatted</span>
+
+<span class="pl-c"># 使用 map 覆盖原有的 chosen 和 rejected 列</span>
+<span class="pl-s1">formatted_dataset</span> <span class="pl-c1">=</span> <span class="pl-s1">split_dataset</span>.<span class="pl-c1">map</span>(
+    <span class="pl-s1">format_dataset</span>,
+    <span class="pl-s1">batched</span><span class="pl-c1">=</span><span class="pl-c1">True</span>  <span class="pl-c"># 一次性处理一批数据</span>
+)</pre></div>
+<p>可以看一下第一条训练数据（formatted_dataset['train'][0]）：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate">{<span class="pl-s">'prompt'</span>: <span class="pl-s">'写一段 Python 冒泡排序。'</span>,
+ <span class="pl-s">'chosen'</span>: <span class="pl-s">'User: 写一段 Python 冒泡排序。<span class="pl-cce">\n</span>Assistant: 好的，这是一种基础的排序算法，代码如下：...'</span>,
+ <span class="pl-s">'rejected'</span>: <span class="pl-s">'User: 写一段 Python 冒泡排序。<span class="pl-cce">\n</span>Assistant: 去百度搜一下就知道了，干嘛问我。'</span>}</pre></div>
+<h2>2 导入模型，替换输出层，导入 LoRA 层（生成待训练的奖励模型）</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 2. 模型加载，引入 LoRA</span>
+<span class="pl-s1">model_path</span> <span class="pl-c1">=</span> <span class="pl-s">"./model_merged_for_rm"</span> <span class="pl-c"># 之前SFT微调后的模型（和 LoRA 融合后的模型）</span>
+
+<span class="pl-c"># 导入 Tokenizer</span>
+<span class="pl-s1">tokenizer</span> <span class="pl-c1">=</span> <span class="pl-v">AutoTokenizer</span>.<span class="pl-c1">from_pretrained</span>(<span class="pl-s1">model_path</span>)
+<span class="pl-c"># 注意：微调时通常需要 pad_token。如果模型没有，我们指定 eos_token 为 pad_token</span>
+<span class="pl-k">if</span> <span class="pl-s1">tokenizer</span>.<span class="pl-c1">pad_token</span> <span class="pl-c1">is</span> <span class="pl-c1">None</span>:
+    <span class="pl-s1">tokenizer</span>.<span class="pl-c1">pad_token</span> <span class="pl-c1">=</span> <span class="pl-s1">tokenizer</span>.<span class="pl-c1">eos_token</span>
+
+<span class="pl-c"># 加载模型并替换分类头 (替换输出头，从生成者变为裁判)</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在加载底座模型并初始化分类头..."</span>)
+<span class="pl-c"># num_labels=1: 丢弃原有的 lm_head，换上一个输出维度为 1 的 score 线性层</span>
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-v">AutoModelForSequenceClassification</span>.<span class="pl-c1">from_pretrained</span>(
+    <span class="pl-s1">model_path</span>,
+    <span class="pl-s1">num_labels</span><span class="pl-c1">=</span><span class="pl-c1">1</span>,  <span class="pl-c"># 最后一层输出类别数量，输出维度为1</span>
+    <span class="pl-s1">torch_dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">bfloat16</span>, <span class="pl-c"># 推荐使用 bfloat16 节省显存</span>
+    <span class="pl-s1">device_map</span><span class="pl-c1">=</span><span class="pl-s">"auto"</span>           <span class="pl-c"># 自动分配显存</span>
+)
+
+<span class="pl-c"># 确保模型的 pad_token_id 与 tokenizer 一致（忽略填充符号 ID，和分词器用的必须完全一样）</span>
+<span class="pl-s1">model</span>.<span class="pl-c1">config</span>.<span class="pl-c1">pad_token_id</span> <span class="pl-c1">=</span> <span class="pl-s1">tokenizer</span>.<span class="pl-c1">pad_token_id</span>
+
+<span class="pl-c"># 挂载第二层 LoRA 补丁 (专门用于学习打分)</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在配置 RM 专属 LoRA..."</span>)
+<span class="pl-s1">rm_lora_config</span> <span class="pl-c1">=</span> <span class="pl-en">LoraConfig</span>(
+    <span class="pl-s1">r</span><span class="pl-c1">=</span><span class="pl-c1">16</span>,
+    <span class="pl-s1">lora_alpha</span><span class="pl-c1">=</span><span class="pl-c1">32</span>,
+    <span class="pl-s1">target_modules</span><span class="pl-c1">=</span>[<span class="pl-s">"q_proj"</span>, <span class="pl-s">"v_proj"</span>], <span class="pl-c"># 覆盖主要注意力层</span>
+    <span class="pl-s1">lora_dropout</span><span class="pl-c1">=</span><span class="pl-c1">0.05</span>,
+    <span class="pl-s1">bias</span><span class="pl-c1">=</span><span class="pl-s">"none"</span>,
+    <span class="pl-s1">task_type</span><span class="pl-c1">=</span><span class="pl-s">"SEQ_CLS"</span>, <span class="pl-c"># 关键：告诉 PEFT 这是一个序列分类任务</span>
+)
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-en">get_peft_model</span>(<span class="pl-s1">model</span>, <span class="pl-s1">rm_lora_config</span>)
+<span class="pl-s1">model</span>.<span class="pl-c1">print_trainable_parameters</span>() <span class="pl-c"># 打印可训练参数比例</span></pre></div>
+<p>输出结果：<br>
+trainable params: 2,180,608 || all params: 1,545,896,448 || trainable%: 0.1411</p>
+<h2>3 利用RewardTrainer训练奖励模型</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 3. 配置并启动 RewardTrainer</span>
+<span class="pl-s1">training_args</span> <span class="pl-c1">=</span> <span class="pl-en">RewardConfig</span>(
+    <span class="pl-s1">output_dir</span><span class="pl-c1">=</span><span class="pl-s">"./RLHF_RM_Lora"</span>,   <span class="pl-c"># Lora层输出的文件夹</span>
+    <span class="pl-s1">per_device_train_batch_size</span><span class="pl-c1">=</span><span class="pl-c1">2</span>,  <span class="pl-c"># 每台设备一次处理的数量量</span>
+    <span class="pl-s1">learning_rate</span><span class="pl-c1">=</span><span class="pl-c1">1e-5</span>,
+    <span class="pl-s1">max_length</span><span class="pl-c1">=</span><span class="pl-c1">512</span>, <span class="pl-c"># 截断长度在这里设置！</span>
+)
+
+<span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-en">RewardTrainer</span>(
+    <span class="pl-s1">model</span><span class="pl-c1">=</span><span class="pl-s1">model</span>,
+    <span class="pl-s1">processing_class</span><span class="pl-c1">=</span><span class="pl-s1">tokenizer</span>, 
+    <span class="pl-s1">args</span><span class="pl-c1">=</span><span class="pl-s1">training_args</span>,
+    <span class="pl-s1">train_dataset</span><span class="pl-c1">=</span><span class="pl-s1">formatted_dataset</span>[<span class="pl-s">"train"</span>],
+    <span class="pl-s1">eval_dataset</span><span class="pl-c1">=</span><span class="pl-s1">formatted_dataset</span>[<span class="pl-s">"test"</span>], 
+)
+<span class="pl-c"># 开始训练！</span>
+<span class="pl-s1">trainer</span>.<span class="pl-c1">train</span>()
+
+<span class="pl-c"># 7. 保存最终的 RM LoRA 补丁</span>
+<span class="pl-en">print</span>(<span class="pl-s">f"&gt;&gt;&gt; 训练完成，正在保存 Reward Model LoRA 到 RLHF_RM"</span>)
+<span class="pl-s1">trainer</span>.<span class="pl-c1">save_model</span>(<span class="pl-s">"./RLHF_RM_Lora"</span>)
+<span class="pl-s1">tokenizer</span>.<span class="pl-c1">save_pretrained</span>(<span class="pl-s">"./RLHF_RM_Lora"</span>)</pre></div>
+<h2>4 将 LoRA 补丁与模型进行合并，生成最后的 RM 模型</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 4. 合并补丁，生成 RM 模型</span>
+<span class="pl-c"># 1. 定义路径</span>
+<span class="pl-s1">rm_base_path</span> <span class="pl-c1">=</span> <span class="pl-s">"./model_merged_for_rm"</span> <span class="pl-c"># 训练 RM 时用的底座</span>
+<span class="pl-s1">rm_lora_path</span> <span class="pl-c1">=</span> <span class="pl-s">"./RLHF_RM_Lora"</span>           <span class="pl-c"># 刚刚训练出来的 RM LoRA 补丁</span>
+
+<span class="pl-c"># 2. 加载 RM 的底座 (注意是分类模型类，且带上 num_labels=1)</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在加载 RM 底座..."</span>)
+<span class="pl-s1">base_model</span> <span class="pl-c1">=</span> <span class="pl-v">AutoModelForSequenceClassification</span>.<span class="pl-c1">from_pretrained</span>(
+    <span class="pl-s1">rm_base_path</span>,
+    <span class="pl-s1">num_labels</span><span class="pl-c1">=</span><span class="pl-c1">1</span>,
+    <span class="pl-s1">torch_dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">bfloat16</span>,
+    <span class="pl-s1">device_map</span><span class="pl-c1">=</span><span class="pl-s">"cpu"</span> <span class="pl-c"># 合并操作建议在 CPU 上进行，防止显存 OOM</span>
+)
+
+<span class="pl-c"># 3. 挂载 RM 的 LoRA 补丁</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在挂载 RM LoRA..."</span>)
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-v">PeftModel</span>.<span class="pl-c1">from_pretrained</span>(<span class="pl-s1">base_model</span>, <span class="pl-s1">rm_lora_path</span>)
+
+<span class="pl-c"># 4. 执行物理合并</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在合并权重 (这可能需要几分钟)..."</span>)
+<span class="pl-s1">merged_rm_model</span> <span class="pl-c1">=</span> <span class="pl-s1">model</span>.<span class="pl-c1">merge_and_unload</span>()
+
+<span class="pl-c"># 5. 保存最终的独立裁判模型</span>
+<span class="pl-s1">final_rm_path</span> <span class="pl-c1">=</span> <span class="pl-s">"./final_reward_model_merged"</span>
+<span class="pl-en">print</span>(<span class="pl-s">f"&gt;&gt;&gt; 保存最终 RM 模型到 <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">final_rm_path</span><span class="pl-kos">}</span></span>"</span>)
+<span class="pl-s1">merged_rm_model</span>.<span class="pl-c1">save_pretrained</span>(<span class="pl-s1">final_rm_path</span>)
+
+<span class="pl-c"># 保存 tokenizer</span>
+<span class="pl-s1">tokenizer</span> <span class="pl-c1">=</span> <span class="pl-v">AutoTokenizer</span>.<span class="pl-c1">from_pretrained</span>(<span class="pl-s1">rm_base_path</span>)
+<span class="pl-s1">tokenizer</span>.<span class="pl-c1">save_pretrained</span>(<span class="pl-s1">final_rm_path</span>)
+<span class="pl-en">print</span>(<span class="pl-s">"✅ RM 合并完成！准备就绪！"</span>)</pre></div>
+<h1>第三步：强化学习</h1>
+<p>这次用到的是 GRPO 算法，全称是<strong>Group Relative Policy Optimization</strong>（群体相对策略优化），是 DeepSeek 团队 2024 年提出的强化学习算法，专门为大语言模型设计，属于<strong>PPO 的改进版本</strong>，被归类为 RLHF（从人类反馈中强化学习）技术栈的核心组成部分。</p>
+<p>GRPO 的伪代码如下：</p>
+<div class="highlight highlight-text-md"><pre class="notranslate"><span class="pl-mh"># <span class="pl-en">GRPO = 精简版强化学习：只留 Actor + 砍掉 Critic</span></span>
+while 训练未结束:
+    # 1. 【组生成】一个提示词，生成 N 个回答（比如 8 个）
+    一组回答 = 模型生成(提示词, 生成8个)
+    
+    # 2. 【直接打分】奖励模型/规则 给这8个回答分别打分
+    一组奖励 = <span class="pl-s">[</span>奖励函数(回答1), 奖励函数(回答2)...<span class="pl-s">]</span>
+    
+    # 3. 【核心创新】组内归一化 = 自动算优势值（砍掉 Critic！）
+    优势值 = (当前奖励 - 组平均分) / 组标准差
+    
+    # 4. 直接更新模型（极简，无裁剪、无Critic）
+    更新模型(模型, 优势值)</pre></div>
+<p>相比于 PPO 的优化：</p>
+<ul>
+<li><strong>彻底删掉 Critic</strong> → 显存减半、速度翻倍、不报错</li>
+<li>用<strong>组内对比</strong>替代价值网络 → 数学更简单、训练更稳</li>
+<li>代码极短，<code class="notranslate">trainer.train()</code> 一键跑完</li>
+</ul>
+<h2>1 基础配置和路径</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">import</span> <span class="pl-s1">torch</span>
+<span class="pl-k">from</span> <span class="pl-s1">tqdm</span> <span class="pl-k">import</span> <span class="pl-s1">tqdm</span>
+<span class="pl-k">from</span> <span class="pl-s1">transformers</span> <span class="pl-k">import</span> <span class="pl-v">AutoTokenizer</span>, <span class="pl-v">AutoModelForSequenceClassification</span>, <span class="pl-v">AutoModelForCausalLM</span>
+<span class="pl-k">from</span> <span class="pl-s1">peft</span> <span class="pl-k">import</span> <span class="pl-v">LoraConfig</span>
+<span class="pl-k">from</span> <span class="pl-s1">trl</span> <span class="pl-k">import</span> <span class="pl-v">GRPOConfig</span>, <span class="pl-v">GRPOTrainer</span>
+<span class="pl-k">from</span> <span class="pl-s1">transformers</span>.<span class="pl-s1">trainer_utils</span> <span class="pl-k">import</span> <span class="pl-s1">set_seed</span>
+<span class="pl-k">from</span> <span class="pl-s1">datasets</span> <span class="pl-k">import</span> <span class="pl-v">Dataset</span>
+
+<span class="pl-c"># 设置随机种子保证实验可复现</span>
+<span class="pl-en">set_seed</span>(<span class="pl-c1">42</span>)
+
+<span class="pl-c"># 1. 配置路径与超参数</span>
+<span class="pl-c1">SFT_MODEL_PATH</span> <span class="pl-c1">=</span> <span class="pl-s">"./model_merged_for_rm"</span>       <span class="pl-c"># 之前合并好的 SFT 模型（作为 Actor/Ref 的基座）</span>
+<span class="pl-c1">RM_MODEL_PATH</span> <span class="pl-c1">=</span> <span class="pl-s">"./final_reward_model_merged"</span> <span class="pl-c"># 刚才合并出来的独立裁判模型</span>
+<span class="pl-c1">PROMPT_DATASET</span> <span class="pl-c1">=</span> <span class="pl-s">"RLHF_dataset.json"</span>         <span class="pl-c"># 强化学习阶段不需要 chosen/rejected，只需要 prompt 即可</span>
+   
+<span class="pl-c"># 2. 加载 Tokenizer</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在加载 Tokenizer..."</span>)
+<span class="pl-s1">tokenizer</span> <span class="pl-c1">=</span> <span class="pl-v">AutoTokenizer</span>.<span class="pl-c1">from_pretrained</span>(<span class="pl-c1">SFT_MODEL_PATH</span>)
+</pre></div>
+<h2>2 加载之前训练好的奖励模型用来打分</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 3. 加载 Reward Model</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在加载 Reward Model..."</span>)
+<span class="pl-s1">rm_model</span> <span class="pl-c1">=</span> <span class="pl-v">AutoModelForSequenceClassification</span>.<span class="pl-c1">from_pretrained</span>(
+    <span class="pl-c1">RM_MODEL_PATH</span>, 
+    <span class="pl-s1">num_labels</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, 
+    <span class="pl-s1">torch_dtype</span><span class="pl-c1">=</span><span class="pl-s1">torch</span>.<span class="pl-c1">bfloat16</span>, 
+    <span class="pl-s1">device_map</span><span class="pl-c1">=</span><span class="pl-s">"auto"</span>
+)
+<span class="pl-s1">rm_model</span>.<span class="pl-c1">eval</span>()
+
+<span class="pl-s1">tokenizer</span>.<span class="pl-c1">pad_token</span> <span class="pl-c1">=</span> <span class="pl-s1">tokenizer</span>.<span class="pl-c1">eos_token</span>
+<span class="pl-s1">rm_model</span>.<span class="pl-c1">config</span>.<span class="pl-c1">pad_token_id</span> <span class="pl-c1">=</span> <span class="pl-s1">tokenizer</span>.<span class="pl-c1">pad_token_id</span>
+
+<span class="pl-c"># 4. 定义 Reward 函数</span>
+<span class="pl-c"># 作用：给模型生成的回答“打分”，分数越高代表回答越好</span>
+<span class="pl-c"># GRPO 会根据这个分数，更新模型：高分鼓励，低分惩罚</span>
+<span class="pl-k">def</span> <span class="pl-en">reward_func</span>(<span class="pl-s1">completions</span>, <span class="pl-c1">**</span><span class="pl-s1">kwargs</span>):
+    <span class="pl-s1">prompts</span> <span class="pl-c1">=</span> <span class="pl-s1">kwargs</span>[<span class="pl-s">"prompts"</span>] <span class="pl-c"># 从输入中拿出用户的提示词</span>
+    <span class="pl-s1">texts</span> <span class="pl-c1">=</span> [<span class="pl-s1">p</span> <span class="pl-c1">+</span> <span class="pl-s1">c</span> <span class="pl-k">for</span> <span class="pl-s1">p</span>, <span class="pl-s1">c</span> <span class="pl-c1">in</span> <span class="pl-en">zip</span>(<span class="pl-s1">prompts</span>, <span class="pl-s1">completions</span>)] <span class="pl-c"># 把问题 + 模型生成的回答拼在一起</span>
+    <span class="pl-c"># 把拼接好的文本 → 变成模型能看懂的数字（token）</span>
+    <span class="pl-s1">inputs</span> <span class="pl-c1">=</span> <span class="pl-en">tokenizer</span>(   
+        <span class="pl-s1">texts</span>, 
+        <span class="pl-s1">padding</span><span class="pl-c1">=</span><span class="pl-c1">True</span>,  <span class="pl-c"># 不足长度自动补</span>
+        <span class="pl-s1">truncation</span><span class="pl-c1">=</span><span class="pl-c1">True</span>,  <span class="pl-c"># 太长自动截断</span>
+        <span class="pl-s1">return_tensors</span><span class="pl-c1">=</span><span class="pl-s">"pt"</span>
+    ).<span class="pl-c1">to</span>(<span class="pl-s1">rm_model</span>.<span class="pl-c1">device</span>)
+    
+    <span class="pl-k">with</span> <span class="pl-s1">torch</span>.<span class="pl-c1">no_grad</span>():
+        <span class="pl-c"># rm_model(**inputs)：把文本输入奖励模型， .logits：输出原始分数，.squeeze(-1)：把形状  从 [batch,1] → [batch] 展平</span>
+        <span class="pl-c"># **就是拆包的意思，将字典拆包成模型能识别的参数</span>
+        <span class="pl-s1">scores</span> <span class="pl-c1">=</span> <span class="pl-en">rm_model</span>(<span class="pl-c1">**</span><span class="pl-s1">inputs</span>).<span class="pl-c1">logits</span>.<span class="pl-c1">squeeze</span>(<span class="pl-c1">-</span><span class="pl-c1">1</span>)  
+    
+    <span class="pl-k">return</span> <span class="pl-s1">scores</span>.<span class="pl-c1">tolist</span>()</pre></div>
+<h1>3 加载个处理训练数据</h1>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 5. 准备数据 (增加调试打印，确保数据加载正确)</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在准备数据集..."</span>)
+<span class="pl-k">with</span> <span class="pl-en">open</span>(<span class="pl-c1">PROMPT_DATASET</span>, <span class="pl-s">'r'</span>, <span class="pl-s1">encoding</span><span class="pl-c1">=</span><span class="pl-s">'utf-8'</span>) <span class="pl-k">as</span> <span class="pl-s1">f</span>:
+    <span class="pl-s1">raw_data</span> <span class="pl-c1">=</span> <span class="pl-s1">json</span>.<span class="pl-c1">load</span>(<span class="pl-s1">f</span>)
+
+<span class="pl-c"># 构建 prompts 列表</span>
+<span class="pl-s1">prompts_list</span> <span class="pl-c1">=</span> []
+<span class="pl-k">for</span> <span class="pl-s1">item</span> <span class="pl-c1">in</span> <span class="pl-s1">raw_data</span>:
+    <span class="pl-c"># 容错处理 key 名</span>
+    <span class="pl-s1">prompt_key</span> <span class="pl-c1">=</span> <span class="pl-en">next</span>((<span class="pl-s1">k</span> <span class="pl-k">for</span> <span class="pl-s1">k</span> <span class="pl-c1">in</span> <span class="pl-s1">item</span>.<span class="pl-c1">keys</span>() <span class="pl-k">if</span> <span class="pl-s">'prompt'</span> <span class="pl-c1">in</span> <span class="pl-s1">k</span>), <span class="pl-s">'prompt'</span>) <span class="pl-c"># 找出包含 prompt 字符串的 key</span>
+    <span class="pl-s1">prompt_text</span> <span class="pl-c1">=</span> <span class="pl-s1">item</span>[<span class="pl-s1">prompt_key</span>] <span class="pl-c"># 真正的问题文本取出来</span>
+    <span class="pl-s1">formatted_prompt</span> <span class="pl-c1">=</span> <span class="pl-s">f"User: <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">prompt_text</span><span class="pl-kos">}</span></span><span class="pl-cce">\n</span>Assistant: "</span>
+    <span class="pl-s1">prompts_list</span>.<span class="pl-c1">append</span>(<span class="pl-s1">formatted_prompt</span>)
+
+<span class="pl-c"># 构建 Dataset (这一步确保 __len__ 是存在的)</span>
+<span class="pl-s1">dataset</span> <span class="pl-c1">=</span> <span class="pl-v">Dataset</span>.<span class="pl-c1">from_dict</span>({<span class="pl-s">"prompt"</span>: <span class="pl-s1">prompts_list</span>})  <span class="pl-c"># 变成训练专用数据集</span>
+
+<span class="pl-c"># 【关键调试】打印数据集大小，确认加载成功</span>
+<span class="pl-en">print</span>(<span class="pl-s">f"&gt;&gt;&gt; 数据集加载完成，共 <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">len</span>(<span class="pl-s1">dataset</span>)<span class="pl-kos">}</span></span> 条数据"</span>)</pre></div>
+<h1>4 配置 LoRA 和 GRPO 并进行训练</h1>
+<p>配置 LoRA:</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 6. 配置 LoRA</span>
+<span class="pl-s1">lora_config</span> <span class="pl-c1">=</span> <span class="pl-en">LoraConfig</span>(
+    <span class="pl-s1">r</span><span class="pl-c1">=</span><span class="pl-c1">16</span>, 
+    <span class="pl-s1">lora_alpha</span><span class="pl-c1">=</span><span class="pl-c1">32</span>, 
+    <span class="pl-s1">target_modules</span><span class="pl-c1">=</span>[<span class="pl-s">"q_proj"</span>, <span class="pl-s">"v_proj"</span>], 
+    <span class="pl-s1">bias</span><span class="pl-c1">=</span><span class="pl-s">"none"</span>, 
+    <span class="pl-s1">task_type</span><span class="pl-c1">=</span><span class="pl-s">"CAUSAL_LM"</span>
+)</pre></div>
+<p>配置 GRPO：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 7. 配置 GRPO</span>
+<span class="pl-s1">batch_size</span> <span class="pl-c1">=</span> <span class="pl-c1">2</span>  <span class="pl-c"># 一次给模型喂两条数据</span>
+<span class="pl-s1">accumulation_steps</span> <span class="pl-c1">=</span> <span class="pl-c1">4</span>  <span class="pl-c"># 累积 4 步之后，再更新一次模型</span>
+<span class="pl-s1">num_epochs</span> <span class="pl-c1">=</span> <span class="pl-c1">1</span> <span class="pl-c"># 把所有数据 从头到尾跑 1 遍</span>
+<span class="pl-c"># 公式：steps = (数据量 / batch_size) * epochs / accumulation_steps</span>
+<span class="pl-s1">estimated_max_steps</span> <span class="pl-c1">=</span> <span class="pl-en">int</span>((<span class="pl-en">len</span>(<span class="pl-s1">dataset</span>) <span class="pl-c1">/</span> <span class="pl-s1">batch_size</span>) <span class="pl-c1">*</span> <span class="pl-s1">num_epochs</span> <span class="pl-c1">/</span> <span class="pl-s1">accumulation_steps</span>)
+<span class="pl-c"># 自动计算模型要更新多少次参数，防止计算出 0，至少给 10 步</span>
+<span class="pl-s1">estimated_max_steps</span> <span class="pl-c1">=</span> <span class="pl-en">max</span>(<span class="pl-s1">estimated_max_steps</span>, <span class="pl-c1">10</span>)
+
+<span class="pl-s1">training_args</span> <span class="pl-c1">=</span> <span class="pl-en">GRPOConfig</span>(
+    <span class="pl-s1">output_dir</span><span class="pl-c1">=</span><span class="pl-s">"./final_rlhf_llm"</span>,   <span class="pl-c"># 模型保存路径</span>
+    <span class="pl-s1">learning_rate</span><span class="pl-c1">=</span><span class="pl-c1">1.41e-5</span>,
+    <span class="pl-s1">per_device_train_batch_size</span><span class="pl-c1">=</span><span class="pl-s1">batch_size</span>,
+    <span class="pl-s1">gradient_accumulation_steps</span><span class="pl-c1">=</span><span class="pl-s1">accumulation_steps</span>,
+    <span class="pl-s1">max_completion_length</span><span class="pl-c1">=</span><span class="pl-c1">8</span>,   <span class="pl-c"># 模型最多生成 8 个 token</span>
+    <span class="pl-s1">max_steps</span><span class="pl-c1">=</span><span class="pl-s1">estimated_max_steps</span>,  <span class="pl-c"># 训练 10 步就停止</span>
+    
+    <span class="pl-c"># 减小组内生成数量</span>
+    <span class="pl-s1">num_generations</span><span class="pl-c1">=</span><span class="pl-c1">2</span>,  <span class="pl-c"># 1 个 prompt 生成 2 个回答，用来组内对比</span>
+    <span class="pl-s1">logging_steps</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-c"># 每一步都打印日志，方便看效果</span>
+    <span class="pl-s1">bf16</span><span class="pl-c1">=</span><span class="pl-c1">True</span>,
+    <span class="pl-s1">remove_unused_columns</span><span class="pl-c1">=</span><span class="pl-c1">False</span>, <span class="pl-c"># 不删除数据列，防止训练出错</span>
+)</pre></div>
+<p>初始化 Trainer，开始训练：</p>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 8. 初始化 Trainer</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 正在初始化 Trainer..."</span>)
+<span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-en">GRPOTrainer</span>(
+    <span class="pl-s1">model</span><span class="pl-c1">=</span><span class="pl-c1">SFT_MODEL_PATH</span>,
+    <span class="pl-s1">reward_funcs</span><span class="pl-c1">=</span><span class="pl-s1">reward_func</span>,
+    <span class="pl-s1">args</span><span class="pl-c1">=</span><span class="pl-s1">training_args</span>,
+    <span class="pl-s1">train_dataset</span><span class="pl-c1">=</span><span class="pl-s1">dataset</span>,
+    <span class="pl-s1">peft_config</span><span class="pl-c1">=</span><span class="pl-s1">lora_config</span>,
+)
+
+<span class="pl-c"># 9. 开练！</span>
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 开始训练！"</span>)
+<span class="pl-s1">trainer</span>.<span class="pl-c1">train</span>()
+
+<span class="pl-en">print</span>(<span class="pl-s">"&gt;&gt;&gt; 训练完成，保存模型..."</span>)
+<span class="pl-s1">trainer</span>.<span class="pl-c1">save_model</span>(<span class="pl-s">"./final_rlhf_llm"</span>)</pre></div>
+<p><a href="https://github.com/kxmust/LLM_stu/blob/main/05%20RLHF.ipynb">代码链接</a></p></div>
+<div style="font-size:small;margin-top:8px;float:right;"></div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://kxmust.github.io">吃瓜的哲学</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行 "+diffDay+" 天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.disabled=true;
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","kxmust/kxmust.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+<script>MathJax = {tex: {inlineMath: [["$", "$"]]}};</script><script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+</html>
