@@ -81,7 +81,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 <strong>(3)储能系统</strong>：由于可再生能源间歇性的特点，为了保障能源的供应安全，通常会安装储能系统来储存能源，便于在能源不足时释放能源，保障能源的供应安全。在储能系统进行充电时，作为能源的消耗者，在储能系统进行放电时，作为能源的供应者。<br>
 <strong>(4)主电网</strong>：作为能源的额外补充，当能源不足时，可以从主电网中购入能源来满足能源需求。当有多余的能源时，也可以卖出能源给主电网来获得收益。</p>
 <div>
-  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/518475b2-9b93-4fb0-b335-2d1ebf60b30a"><img src="https://github.com/user-attachments/assets/518475b2-9b93-4fb0-b335-2d1ebf60b30a" alt="描述文本" width="500" height="300" style="max-width: 100%; height: auto; max-height: 300px;; aspect-ratio: 500 / 300; background-color: var(--bgColor-muted); border-radius: 6px; display: block" class="js-gh-image-fallback"></a>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/518475b2-9b93-4fb0-b335-2d1ebf60b30a"><img src="https://github.com/user-attachments/assets/518475b2-9b93-4fb0-b335-2d1ebf60b30a" alt="描述文本" width="500" height="300" style="max-width: 100%; height: auto; max-height: 300px;; aspect-ratio: 500 / 300; background-color: var(--bgColor-muted); border-radius: 6px" class="js-gh-image-fallback"></a>
   <p>图 1：一个简单的住宅微电网</p>
 </div>
 <p>我们将上述的组件抽象出来，构建出我们的能源控制模型，结构如图 2 所示。在每个时刻，能源管理系统会收到来自光伏面板、用电负载、储能系统和主电网的相关信息。能源管理系统会基于这些信息，智能化调度储能系统的充放电功率以及与主电网的交易量，来实现可再生能源的最大化利用，降低用户的用电成本。</p>
@@ -90,7 +90,7 @@ body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;
 </blockquote>
 <p>我们的优化目标就是构建一个可以根据输入信息，智能化调度储能系统和交易量的能源管理系统，来提高能源利用效率，在保障用电负载的同时减少用户的用电费用，实现最优的经济化调度。</p>
 <div>
-  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f2f0c4af-b593-4979-b724-4aea8906375b"><img src="https://github.com/user-attachments/assets/f2f0c4af-b593-4979-b724-4aea8906375b" alt="描述文本" width="400" height="600" style="max-width: 100%; height: auto; max-height: 600px;; aspect-ratio: 400 / 600; background-color: var(--bgColor-muted); border-radius: 6px; display: block" class="js-gh-image-fallback"></a>
+  <a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/f2f0c4af-b593-4979-b724-4aea8906375b"><img src="https://github.com/user-attachments/assets/f2f0c4af-b593-4979-b724-4aea8906375b" alt="描述文本" width="400" height="600" style="max-width: 100%; height: auto; max-height: 600px;; aspect-ratio: 400 / 600; background-color: var(--bgColor-muted); border-radius: 6px" class="js-gh-image-fallback"></a>
   <p>图 2：住宅微电网的控制模型架构</p>
 </div>
 <h2>2. 组件和相关约束</h2>
